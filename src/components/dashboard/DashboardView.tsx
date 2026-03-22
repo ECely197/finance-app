@@ -313,7 +313,7 @@ export const DashboardView = () => {
                       <RechartsTooltip 
                         cursor={{ fill: 'rgba(59, 130, 246, 0.04)' }} 
                         contentStyle={{ borderRadius: '1.2rem', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}
-                        formatter={(value: any, name: string) => [formatCurrency(Number(value)), name]}
+                        formatter={(value: any, name: any) => [formatCurrency(Number(value)), name]}
                         labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}
                       />
                       <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: 600, color: '#64748b', paddingBottom: '20px' }} />

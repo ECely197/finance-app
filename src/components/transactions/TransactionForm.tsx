@@ -157,7 +157,7 @@ export const TransactionForm = () => {
             <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Tipo de Operación</label>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
               {transactionTypes.map((t) => (
-                <button
+                <motion.button
                   key={t.id}
                   type="button"
                   whileTap={{ scale: 0.95 }}
@@ -169,7 +169,7 @@ export const TransactionForm = () => {
                     }`}
                 >
                   {t.label}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
