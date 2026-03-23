@@ -282,7 +282,7 @@ export const MainLayout = () => {
                   initial={{ scale: 0.9, opacity: 0, y: 20 }} 
                   animate={{ scale: 1, opacity: 1, y: 0 }} 
                   exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                  className="bg-white relative w-full max-w-lg max-h-[90vh] rounded-[2.5rem] shadow-2xl z-10 overflow-hidden flex flex-col p-6"
+                  className="bg-white relative w-full max-w-lg max-h-[85vh] rounded-[2.5rem] shadow-2xl z-10 overflow-hidden flex flex-col p-6"
                 >
                    <div className="flex justify-between items-center mb-6 shrink-0">
                       <div className="flex items-center gap-3">
@@ -291,7 +291,7 @@ export const MainLayout = () => {
                       </div>
                       <button onClick={() => setShowProjectsModal(false)} className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors outline-none"><X size={20} /></button>
                    </div>
-                   <div className="flex-1 overflow-y-auto custom-scrollbar">
+                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
                       <ProjectsView hideHeader={true} />
                    </div>
                 </motion.div>

@@ -119,6 +119,21 @@ export const ProjectsView = ({ hideHeader = false }: { hideHeader?: boolean }) =
         </div>
       )}
 
+       {/* Add new project button when in modal context */}
+       {hideHeader && (
+         <motion.button 
+           whileHover={{ scale: 1.01 }}
+           whileTap={{ scale: 0.99 }}
+           onClick={() => setShowModal(true)}
+           className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50/50 hover:bg-blue-50 hover:border-blue-200 transition-all group flex flex-col items-center justify-center gap-2 mb-4"
+         >
+            <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
+               <Plus size={20} strokeWidth={3} />
+            </div>
+            <span className="text-sm font-black text-slate-600 group-hover:text-blue-600 uppercase tracking-widest">Nuevo Proyecto o Hábito</span>
+         </motion.button>
+       )}
+
        {loading ? (
          <div className="flex justify-center items-center h-64">
             <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
