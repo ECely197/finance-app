@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useObligationsData } from '../../hooks/useObligationsData';
 import { useAppStore } from '../../store/useAppStore';
@@ -7,7 +7,7 @@ import { createObligation, deleteObligation, updateObligation } from '../../lib/
 
 export const ObligationsView = () => {
    const { user, currentProfile } = useAppStore();
-   const { obligations, incomes, loading } = useObligationsData();
+   const { processedObligations, loading } = useObligationsData();
 
    const [showModal, setShowModal] = useState(false);
    const [titulo, setTitulo] = useState('');
@@ -16,44 +16,7 @@ export const ObligationsView = () => {
    const [isSubmitting, setIsSubmitting] = useState(false);
    const [toastMsg, setToastMsg] = useState('');
 
-   const processedObligations = useMemo(() => {
-     return obligations.map(ob => {
-         const fInicio = ob.fechaInicio?.toDate ? ob.fechaInicio.toDate() : new Date(ob.fechaInicio);
-         const fLimit = ob.fechaLimite?.toDate ? ob.fechaLimite.toDate() : new Date(ob.fechaLimite);
-         
-         const validIncomes = incomes.filter(inc => {
-             const d = inc.date?.toDate ? inc.date.toDate() : new Date(inc.date.seconds * 1000);
-             return d >= fInicio && d <= new Date(); 
-         });
-         
-         const totalIncome = validIncomes.reduce((sum, i) => sum + i.amount, 0);
-         const progress = ob.montoObjetivo > 0 ? Math.min((totalIncome / ob.montoObjetivo) * 100, 100) : 100;
-         const remainingAmount = Math.max(ob.montoObjetivo - totalIncome, 0);
-
-         const now = new Date();
-         now.setHours(0,0,0,0);
-         const limitDate = new Date(fLimit);
-         limitDate.setHours(23,59,59,999);
-         const diffTime = limitDate.getTime() - now.getTime();
-         const daysRemaining = Math.max(Math.ceil(diffTime / (1000 * 60 * 60 * 24)), 0);
-
-         return {
-            ...ob,
-            totalIncome,
-            progress,
-            remainingAmount,
-            daysRemaining,
-            fInicio,
-            fLimit
-         };
-     }).sort((a,b) => {
-         if (a.cumplida && !b.cumplida) return 1;
-         if (!a.cumplida && b.cumplida) return -1;
-         return a.daysRemaining - b.daysRemaining;
-     });
-  }, [obligations, incomes]);
-
-  const handleCreate = async (e: React.FormEvent) => {
+   const handleCreate = async (e: React.FormEvent) => {
      e.preventDefault();
      if (!user || !currentProfile || !titulo.trim() || !monto || !fechaLimite) return;
      setIsSubmitting(true);
@@ -176,14 +139,14 @@ export const ObligationsView = () => {
                      <div className="mb-4">
                         <div className="flex justify-between text-[11px] font-black uppercase tracking-widest mb-2.5">
                            <span className={isCompleted ? 'text-emerald-500' : 'text-slate-400'}>{isCompleted ? 'Meta Asegurada' : 'Generado en Ventas'}</span>
-                           <span className={isCompleted ? 'text-emerald-600' : 'text-blue-600'}>{ob.progress.toFixed(0)}%</span>
+                           <span className={isCompleted ? 'text-emerald-600' : ob.isGoodTrend ? 'text-emerald-600' : 'text-blue-600'}>{ob.progress.toFixed(0)}%</span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner relative">
                            <motion.div 
-                              className={`h-full absolute left-0 top-0 rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-gradient-to-r from-blue-600 to-blue-400'}`}
+                              className={`h-full absolute left-0 top-0 rounded-full ${isCompleted ? 'bg-emerald-500' : ob.isGoodTrend ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : 'bg-gradient-to-r from-blue-600 to-blue-400'}`}
                               initial={{ width: 0 }}
                               animate={{ width: `${ob.progress}%` }}
-                              transition={{ duration: 1.2, ease: "easeOut" }}
+                              transition={{ duration: 1.5, ease: "easeOut", delay: 0.1 }}
                            />
                         </div>
                      </div>
@@ -191,9 +154,13 @@ export const ObligationsView = () => {
                      <div className="flex items-end justify-between mt-4 pb-2 border-b border-dashed border-slate-100 mb-4">
                          <div className="flex flex-col">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Falta Vender</span>
-                            <span className={`text-lg font-extrabold tracking-tight ${ob.remainingAmount > 0 ? 'text-slate-700' : 'text-emerald-500'}`}>
-                               {ob.remainingAmount > 0 ? formatCurrency(ob.remainingAmount) : '$0'}
-                            </span>
+                            {ob.remainingAmount <= 0 ? (
+                               <span className="text-lg font-extrabold tracking-tight text-emerald-500">¡Meta cumplida! 🎉</span>
+                            ) : (
+                               <span className="text-lg font-extrabold tracking-tight text-slate-700">
+                                  {formatCurrency(ob.remainingAmount)}
+                               </span>
+                            )}
                          </div>
                          <div className="flex flex-col items-end">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Límite</span>

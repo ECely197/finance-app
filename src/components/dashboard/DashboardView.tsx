@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ComposedChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useAppStore } from '../../store/useAppStore';
 import { useDashboardData } from '../../hooks/useDashboardData';
-import { Wallet, CreditCard, DollarSign, Activity, Calendar as CalendarIcon, Filter, X, ArrowUpRight, ArrowDownRight, Tag, TrendingDown, Briefcase } from 'lucide-react';
+import { useObligationsData } from '../../hooks/useObligationsData';
+import { useNavigate } from 'react-router-dom';
+import { Wallet, CreditCard, DollarSign, Activity, Calendar as CalendarIcon, Filter, X, ArrowUpRight, ArrowDownRight, Tag, TrendingDown, Briefcase, Target } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
 
@@ -53,6 +55,17 @@ export const DashboardView = () => {
 
   const { startStr, endStr } = useMemo(() => getRangeDates(timeRange, customStart, customEnd), [timeRange, customStart, customEnd]);
   const { transactions, categories, investments, linkedIncomes, loading } = useDashboardData(startStr, endStr);
+
+  const navigate = useNavigate();
+  const { processedObligations, loading: obsLoading } = useObligationsData();
+  const topUrgentObs = processedObligations.filter(ob => !ob.cumplida).slice(0, 3);
+
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -176,9 +189,18 @@ export const DashboardView = () => {
         incomeMap[catName] = (incomeMap[catName] || 0) + tx.amount;
       }
     });
-    return Object.entries(incomeMap)
+
+    const sorted = Object.entries(incomeMap)
       .map(([name, value]) => ({ name, value }))
       .sort((a,b) => b.value - a.value);
+
+    // Only keep top 5, merge others into "Otros"
+    if (sorted.length > 5) {
+       const top5 = sorted.slice(0, 5);
+       const othersVal = sorted.slice(5).reduce((sum, item) => sum + item.value, 0);
+       return [...top5, { name: 'Otros', value: othersVal }];
+    }
+    return sorted;
   }, [transactions, categories]);
 
   // ROI Logic
@@ -333,25 +355,25 @@ export const DashboardView = () => {
             {/* Evolución Diaria (ComposedChart 100% width) */}
             <motion.div variants={itemVariants} className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 w-full mb-6">
               <div className="mb-8">
-                <h3 className="text-xl font-extrabold text-slate-800 tracking-tight">Evolución Diaria</h3>
-                <p className="text-sm font-semibold text-slate-400 mt-1">Comparativa de ingresos y tendencia de balance. (Haz clic en una barra para ver detalles del día).</p>
+                <h3 className="text-xs sm:text-sm font-extrabold text-slate-500 uppercase tracking-widest">Evolución Diaria</h3>
+                <p className="text-xs sm:text-sm font-semibold text-slate-400 mt-1">Comparativa de ingresos y tendencia de balance. Toca una barra para ver los movimientos de ese día.</p>
               </div>
-              <div className="h-[320px] w-full cursor-pointer">
+              <div className="h-[320px] w-full cursor-pointer ml-[-10px] md:ml-0">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={dailyEvolutionData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} onClick={handleBarClick}>
+                    <ComposedChart data={dailyEvolutionData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} onClick={handleBarClick}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }} dy={12} minTickGap={30} />
-                      <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 600 }} tickFormatter={(val) => `$${val >= 1000 ? val/1000 + 'k' : val}`} />
+                      <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }} dy={12} minTickGap={30} />
+                      <YAxis yAxisId="left" axisLine={false} tickLine={false} width={50} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} tickFormatter={(val) => val >= 1000 ? `${(val/1000).toFixed(0)}k` : val} />
                       <YAxis yAxisId="right" orientation="right" hide />
                       <RechartsTooltip 
                         cursor={{ fill: 'rgba(59, 130, 246, 0.04)' }} 
                         contentStyle={{ borderRadius: '1.2rem', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}
-                        formatter={(value: any, name: any) => [formatCurrency(Number(value)), name]}
+                        formatter={(value: any, name: any) => [formatCurrency(Number(value)), name === 'Ingresos' ? 'Ingresos' : 'Balance Neto']}
                         labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}
                       />
-                      <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: 600, color: '#64748b', paddingBottom: '20px' }} />
-                      <Bar yAxisId="left" dataKey="Ingresos" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={40} />
-                      <Line yAxisId="right" type="monotone" dataKey="Balance" name="Margen / Balance Neto" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} />
+                      <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b', paddingBottom: '20px' }} />
+                      <Bar yAxisId="left" dataKey="Ingresos" fill="#3b82f6" fillOpacity={0.8} radius={[6, 6, 0, 0]} maxBarSize={40} />
+                      <Line yAxisId="right" type="monotone" dataKey="Balance" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} />
                     </ComposedChart>
                   </ResponsiveContainer>
               </div>
@@ -360,58 +382,76 @@ export const DashboardView = () => {
             {/* Charts Module Baseline */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Bar Chart: Mejores Dias */}
-              <motion.div variants={itemVariants} className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 lg:col-span-2">
-                <div className="mb-8">
-                  <h3 className="text-xl font-extrabold text-slate-800 tracking-tight">Análisis de Mejores Días</h3>
-                  <p className="text-sm font-semibold text-slate-400 mt-1">Distribución histórica de Ingresos según el día de la semana</p>
+              <motion.div variants={itemVariants} className="bg-white p-6 md:p-8 pt-8 pb-10 rounded-[2.5rem] shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 lg:col-span-2">
+                <div className="mb-10">
+                  <h3 className="text-xs sm:text-sm font-extrabold text-slate-500 uppercase tracking-widest">Análisis de Mejores Días</h3>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-400 mt-1">Distribución histórica de Ingresos según el día de la semana</p>
                 </div>
-                <div className="h-[280px] w-full border-t border-slate-50 pt-4">
+                <div className="h-[280px] w-full border-t border-slate-50 pt-6 ml-[-15px] md:ml-0">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={weekdaysChart} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                      <BarChart data={weekdaysChart} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 13, fontWeight: 700 }} dy={12} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 600 }} tickFormatter={(val) => `$${val/1000}k`} />
+                        <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }} dy={12} />
+                        <YAxis axisLine={false} tickLine={false} width={45} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} tickFormatter={(val) => val >= 1000 ? `${(val/1000).toFixed(0)}k` : val} />
                         <RechartsTooltip 
                           cursor={{ fill: '#f8fafc' }} 
                           contentStyle={{ borderRadius: '1.2rem', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}
                           formatter={(value: any) => formatCurrency(Number(value))}
                           labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}
                         />
-                        <Bar dataKey="Income" name="Ingresos" fill="#f59e0b" radius={[12, 12, 0, 0]} maxBarSize={50} />
+                        <Bar dataKey="Income" name="Ingresos" radius={[12, 12, 0, 0]} maxBarSize={50}>
+                           {weekdaysChart.map((entry, index) => {
+                              const maxIncome = Math.max(...weekdaysChart.map(d => d.Income));
+                              const opacity = entry.Income === maxIncome && entry.Income > 0 ? 1 : 0.6;
+                              return <Cell key={`cell-${index}`} fill="#3b82f6" fillOpacity={opacity} />;
+                           })}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                 </div>
               </motion.div>
 
               {/* Pie Chart: Top Categorías */}
-              <motion.div variants={itemVariants} className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col">
-                <div className="mb-4">
-                  <h3 className="text-xl font-extrabold text-slate-800 tracking-tight">Top Categorías</h3>
-                  <p className="text-sm font-semibold text-slate-400 mt-1">De dónde provienen tus ingresos</p>
+              <motion.div variants={itemVariants} className="bg-white p-6 md:p-8 pt-8 pb-10 rounded-[2.5rem] shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col">
+                <div className="mb-6">
+                  <h3 className="text-xs sm:text-sm font-extrabold text-slate-500 uppercase tracking-widest">Top Categorías</h3>
+                  <p className="text-xs sm:text-sm font-semibold text-slate-400 mt-1">Fuentes de mayores ingresos</p>
                 </div>
-                <div className="flex-1 min-h-[240px] relative mt-4">
+                <div className="flex-1 h-[300px] w-full relative mt-2 border-t border-slate-50">
                   {pieData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
+                      <PieChart margin={{ top: 20, right: 0, bottom: 0, left: 0 }}>
                         <Pie
                           data={pieData}
-                          cx="50%" cy="50%"
-                          innerRadius={70} outerRadius={95}
+                          cx="50%" 
+                          cy="50%"
+                          innerRadius={isDesktop ? 70 : 65} 
+                          outerRadius={isDesktop ? 90 : 85}
                           paddingAngle={6}
                           dataKey="value"
                           stroke="none"
-                          cornerRadius={10}
+                          cornerRadius={6}
                         >
                           {pieData.map((_entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
                         <RechartsTooltip 
-                          formatter={(value: any) => formatCurrency(Number(value))}
+                          formatter={(value: any) => {
+                             const total = pieData.reduce((sum, item) => sum + item.value, 0);
+                             const percentage = ((Number(value) / total) * 100).toFixed(1);
+                             return [`${formatCurrency(Number(value))} (${percentage}%)`];
+                          }}
                           contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }} 
-                          itemStyle={{ fontWeight: 'bold' }}
+                          itemStyle={{ fontWeight: 'bold', color: '#334155' }}
                         />
-                        <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}/>
+                        <Legend 
+                           verticalAlign={isDesktop ? "middle" : "bottom"}
+                           layout={isDesktop ? "vertical" : "horizontal"}
+                           align={isDesktop ? "right" : "center"}
+                           iconType="circle" 
+                           wrapperStyle={{ fontSize: '11px', fontWeight: 600, color: '#64748b', paddingBottom: isDesktop ? '0' : '10px' }}
+                        />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
@@ -420,6 +460,71 @@ export const DashboardView = () => {
                 </div>
               </motion.div>
             </div>
+
+            {/* Responsabilidades Próximas */}
+            <motion.div variants={itemVariants} className="w-full">
+              <div className="flex justify-between items-center mb-6 pl-2">
+                 <div>
+                   <h3 className="text-xl font-extrabold text-slate-800 tracking-tight">Responsabilidades Próximas</h3>
+                   <p className="text-sm font-semibold text-slate-400 mt-1">Sigue el progreso de ventas hacia tus metas más urgentes.</p>
+                 </div>
+              </div>
+
+              {obsLoading ? (
+                 <div className="flex justify-center items-center h-24">
+                   <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
+                 </div>
+              ) : topUrgentObs.length === 0 ? (
+                 <div className="bg-white border border-dashed border-slate-300 rounded-[2rem] p-8 text-center shadow-sm flex flex-col items-center">
+                    <p className="text-slate-500 font-bold mb-4">No tienes responsabilidades pendientes o próximas.</p>
+                    <button onClick={() => navigate('/obligations')} className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-600 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm">
+                       + Crear nueva meta
+                    </button>
+                 </div>
+              ) : (
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {topUrgentObs.map(ob => {
+                       const isUrgent = ob.daysRemaining <= 5;
+                       return (
+                          <div 
+                             key={ob.id} 
+                             onClick={() => navigate('/obligations')}
+                             className={`bg-white rounded-[2rem] p-5 cursor-pointer shadow-[0_4px_30px_rgb(0,0,0,0.02)] border transition-all hover:-translate-y-1 hover:shadow-lg group ${
+                                isUrgent ? 'border-orange-100' : 'border-slate-100 hover:border-blue-100'
+                             }`}
+                          >
+                             <div className="flex justify-between items-start mb-4">
+                               <div className="flex items-center gap-3">
+                                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isUrgent ? 'bg-orange-50 text-orange-500' : 'bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500'}`}>
+                                     <Target size={18} strokeWidth={2.5}/>
+                                  </div>
+                                  <h4 className="font-extrabold text-slate-700 line-clamp-1">{ob.titulo}</h4>
+                               </div>
+                               <div className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${isUrgent ? 'bg-orange-50 text-orange-600' : 'bg-slate-50 text-slate-500'}`}>
+                                  {ob.daysRemaining === 0 ? 'Vence hoy' : `Faltan ${ob.daysRemaining}d`}
+                               </div>
+                             </div>
+                             
+                             <div>
+                                <div className="flex justify-between text-[11px] font-black uppercase tracking-widest mb-2">
+                                   <span className="text-slate-400">Progreso</span>
+                                   <span className={ob.isGoodTrend ? 'text-emerald-600' : 'text-blue-600'}>{ob.progress.toFixed(0)}%</span>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden shadow-inner relative">
+                                   <motion.div 
+                                      className={`h-full absolute left-0 top-0 rounded-full ${ob.isGoodTrend ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : 'bg-gradient-to-r from-blue-600 to-blue-400'}`}
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${ob.progress}%` }}
+                                      transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
+                                   />
+                                </div>
+                             </div>
+                          </div>
+                       );
+                    })}
+                 </div>
+              )}
+            </motion.div>
 
             {/* ROI Módulo Inteligente (Negocios) - Optional view if they still want it here */}
             {currentProfile?.type === 'Business' && (

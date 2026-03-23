@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, PlusCircle, Plus, TrendingUp, Settings, LogOut, ScrollText, Target, X } from 'lucide-react';
+import { LayoutDashboard, Plus, TrendingUp, Settings, LogOut, ScrollText, Target, X } from 'lucide-react';
 import { ProfileSelector } from './ProfileSelector';
 import { TransactionForm } from '../transactions/TransactionForm';
 import { auth } from '../../lib/firebase';
@@ -14,7 +14,6 @@ export const MainLayout = () => {
   const navItems = [
     { name: 'Resumen', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Historial', path: '/transactions', icon: ScrollText },
-    { name: 'Añadir', action: 'openModal', icon: PlusCircle },
     { name: 'Metas', path: '/obligations', icon: Target },
     { name: 'Inversiones', path: '/investments', icon: TrendingUp },
     { name: 'Ajustes', path: '/settings', icon: Settings },
@@ -32,6 +31,26 @@ export const MainLayout = () => {
     signOut(auth);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+       if (e.key === 'Escape' && isModalOpen) {
+          e.preventDefault();
+          setIsModalOpen(false);
+          return;
+       }
+
+       const target = e.target as HTMLElement;
+       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+       
+       if (e.key.toLowerCase() === 'n' || e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          setIsModalOpen(prev => !prev);
+       }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isModalOpen]);
+
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row text-slate-800 overflow-x-hidden">
       
@@ -43,21 +62,23 @@ export const MainLayout = () => {
           </div>
           <span className="text-xl font-bold tracking-tight text-slate-800">FinanceApp</span>
         </div>
-        
+        <div className="mb-8 px-2">
+           <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setIsModalOpen(true)}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-3 py-3.5 rounded-full font-bold shadow-md shadow-blue-500/20 transition-all outline-none"
+           >
+              <Plus size={20} strokeWidth={2.5}/>
+              Nueva Transacción
+           </motion.button>
+           <div className="flex justify-center mt-2.5">
+             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 shadow-sm shrink-0">Presiona 'N'</span>
+           </div>
+        </div>
+
         <nav className="flex-1 space-y-2">
           {navItems.map((item) => {
-            if (item.action === 'openModal') {
-               return (
-                 <button
-                   key={item.name}
-                   onClick={() => setIsModalOpen(true)}
-                   className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl font-medium transition-all duration-200 text-slate-600 hover:bg-slate-50 outline-none"
-                 >
-                   <item.icon size={22} />
-                   {item.name}
-                 </button>
-               );
-            }
             return (
               <NavLink
                 key={item.name}
