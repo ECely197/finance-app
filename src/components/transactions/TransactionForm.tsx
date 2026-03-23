@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../../store/useAppStore';
 import { createTransaction, getCategories, getInvestments } from '../../lib/firestore';
-import { CheckCircle2, DollarSign, Calendar, FileText, Link2, Briefcase, User as UserIcon } from 'lucide-react';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+import { CheckCircle2, DollarSign, Calendar, FileText, Link2, Briefcase, User as UserIcon, Tag, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const transactionTypes = [
@@ -13,7 +15,7 @@ const transactionTypes = [
   { id: 'inversion', label: 'Inversión', color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200' },
 ];
 
-export const TransactionForm = () => {
+export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => {
   const navigate = useNavigate();
   const { user, profiles, currentProfile } = useAppStore();
   
@@ -32,7 +34,9 @@ export const TransactionForm = () => {
   
   // UI states
   const [loading, setLoading] = useState(false);
+  const [successAnim, setSuccessAnim] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [showDate, setShowDate] = useState(false);
 
   useEffect(() => {
     if (currentProfile?.id && !selectedProfileId) {
@@ -47,11 +51,22 @@ export const TransactionForm = () => {
       try {
         const cats = await getCategories(user.uid, selectedProfileId);
         const invs = await getInvestments(user.uid, selectedProfileId);
+        
+        // Smart Sorting by Frequency
+        try {
+           const txRef = collection(db, `users/${user.uid}/profiles/${selectedProfileId}/transactions`);
+           const qTx = query(txRef, orderBy('date', 'desc'), limit(50));
+           const txSnap = await getDocs(qTx);
+           const freq: Record<string, number> = {};
+           txSnap.docs.forEach(d => {
+              const t = d.data();
+              if (t.categoryId) freq[t.categoryId] = (freq[t.categoryId] || 0) + 1;
+           });
+           cats.sort((a, b) => (freq[b.id] || 0) - (freq[a.id] || 0));
+        } catch(e) { console.error("Error sorting categories", e); }
+
         setCategories(cats);
-        // If the current selected category is no longer valid, clear it
-        if (!cats.find(c => c.id === categoryId)) {
-           setCategoryId('');
-        }
+        if (!cats.find(c => c.id === categoryId)) setCategoryId('');
         setInvestments(invs);
       } catch (err) {
         console.error("Error loading metadata:", err);
@@ -59,7 +74,13 @@ export const TransactionForm = () => {
     };
     
     loadMetadata();
-  }, [user, selectedProfileId, categoryId]); // Added categoryId conceptually but it shouldn't trigger infinite load
+  }, [user, selectedProfileId]); // removed categoryId to avoid loops
+
+  const filteredCategories = categories.filter(c => {
+     if (!c.type || c.type === 'general') return true;
+     if (type === 'ingreso' || type === 'inversion') return c.type === 'ingreso';
+     return c.type === 'gasto';
+  });
 
   const activeProfile = profiles.find(p => p.id === selectedProfileId);
   const showInvestmentLink = type === 'ingreso' && activeProfile?.type === 'Business';
@@ -91,8 +112,11 @@ export const TransactionForm = () => {
       setCategoryId('');
       setDescription('');
       
-      setToastMessage('Movimiento guardado exitosamente');
-      setTimeout(() => setToastMessage(''), 4000);
+      setSuccessAnim(true);
+      setTimeout(() => {
+         setSuccessAnim(false);
+         if (onComplete) onComplete();
+      }, 1000);
       
     } catch (error) {
        console.error(error);
@@ -104,8 +128,24 @@ export const TransactionForm = () => {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto relative pb-10">
+    <div className="w-full flex-1 flex flex-col relative min-h-0">
       <AnimatePresence>
+        {successAnim && (
+           <motion.div 
+             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+             className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-[2.5rem]"
+           >
+              <motion.div 
+                initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", bounce: 0.5 }}
+                className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center shadow-[0_10px_40px_rgba(16,185,129,0.4)] text-white mb-4"
+              >
+                 <Check size={48} strokeWidth={3} />
+              </motion.div>
+              <h3 className="text-2xl font-extrabold text-slate-800">¡Bóveda Actualizada!</h3>
+              <p className="text-slate-500 font-bold mt-2">Movimiento registrado</p>
+           </motion.div>
+        )}
+        
         {toastMessage && (
           <motion.div
             initial={{ opacity: 0, y: 50, scale: 0.9 }}
@@ -119,17 +159,14 @@ export const TransactionForm = () => {
         )}
       </AnimatePresence>
 
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-[0_8px_40px_rgb(0,0,0,0.03)] border border-slate-100 relative overflow-hidden"
-      >
-        <div className="mb-8">
-          <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Registro Financiero</h2>
-          <p className="text-slate-500 font-medium mt-1">Añade un nuevo movimiento a tus finanzas.</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="w-full flex-1 flex flex-col min-h-0">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          
+          <div className="flex-1 overflow-y-auto px-6 md:px-10 pt-4 pb-[80px] custom-scrollbar space-y-8">
+            <div className="mb-2">
+              <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Registro</h2>
+              <p className="text-slate-500 font-medium mt-1">Añade un nuevo movimiento.</p>
+            </div>
           
           {/* Perfil */}
           <div>
@@ -174,7 +211,7 @@ export const TransactionForm = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          <div className="pt-2">
             {/* Monto */}
             <div>
               <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Monto Total</label>
@@ -184,30 +221,16 @@ export const TransactionForm = () => {
                 </div>
                 <input
                   type="number"
+                  inputMode="decimal"
+                  autoFocus
                   step="0.01"
                   min="0"
                   required
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
                   className="w-full pl-10 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-extrabold text-slate-800 text-xl"
                   placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            {/* Fecha */}
-            <div>
-              <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Día de la Operación</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Calendar size={20} className="text-slate-400" />
-                </div>
-                <input
-                  type="date"
-                  required
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-slate-700 cursor-pointer text-lg"
                 />
               </div>
             </div>
@@ -215,31 +238,37 @@ export const TransactionForm = () => {
 
           {/* Categorías (Chips) */}
           <div>
-            <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Categoría de la lista</label>
-            {categories.length === 0 ? (
+            <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">¿En qué categoría?</label>
+            {filteredCategories.length === 0 ? (
                <div className="bg-slate-50 border border-dashed border-slate-300 rounded-3xl p-6 text-center shadow-sm">
-                  <p className="text-slate-500 font-bold mb-3">Aún no tienes categorías en este perfil.</p>
+                  <p className="text-slate-500 font-bold mb-3">No hay categorías para este tipo de movimiento.</p>
                   <button type="button" onClick={() => navigate('/settings')} className="bg-white border border-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] hover:bg-slate-100 transition-all active:scale-95">
-                     Ir al Gestor de Categorías
+                     Ir a Ajustes para crearlas
                   </button>
                </div>
             ) : (
                <div className="flex flex-wrap gap-2">
-                 {categories.map((cat) => (
-                   <motion.button
-                     key={cat.id}
-                     type="button"
-                     whileTap={{ scale: 0.95 }}
-                     onClick={() => setCategoryId(cat.id)}
-                     className={`px-4 py-2.5 rounded-full font-bold text-[14px] transition-all border ${
-                        categoryId === cat.id 
-                          ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/30' 
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-[0_2px_10px_rgb(0,0,0,0.02)]'
-                     }`}
-                   >
-                     {cat.name}
-                   </motion.button>
-                 ))}
+                 {filteredCategories.map((cat, idx) => {
+                   const isTop = idx < 3;
+                   return (
+                     <motion.button
+                       key={cat.id}
+                       type="button"
+                       whileTap={{ scale: 0.95 }}
+                       onClick={() => setCategoryId(cat.id)}
+                       className={`px-4 py-3 rounded-full font-bold transition-all border flex items-center gap-1.5 ${
+                          categoryId === cat.id 
+                            ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/30' 
+                            : isTop
+                              ? 'bg-blue-50/50 border-blue-100 text-blue-700 hover:bg-blue-100'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
+                       } ${isTop ? 'text-[15px]' : 'text-[13px]'}`}
+                     >
+                       {isTop && <Tag size={14} className={categoryId === cat.id ? 'text-white/80' : 'text-blue-500/50'} />}
+                       {cat.name}
+                     </motion.button>
+                   );
+                 })}
                </div>
             )}
           </div>
@@ -295,7 +324,36 @@ export const TransactionForm = () => {
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-100 mt-6">
+          {/* Resto de Datos Ocultos (Fecha) */}
+          <div>
+             <button type="button" onClick={() => setShowDate(!showDate)} className="text-sm font-extrabold text-blue-500 hover:text-blue-600 flex items-center gap-2">
+                {showDate ? 'Ocultar fecha manual' : 'Cambiar fecha (Por defecto Hoy)'}
+             </button>
+             <AnimatePresence>
+                {showDate && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pt-4 overflow-hidden">
+                    <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Día de la Operación</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Calendar size={20} className="text-slate-400" />
+                      </div>
+                      <input
+                        type="date"
+                        required
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-slate-700 cursor-pointer text-lg"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+             </AnimatePresence>
+          </div>
+
+          </div>
+
+          {/* Sticky Footer */}
+          <div className="shrink-0 p-5 md:p-6 border-t border-slate-100 bg-white/95 backdrop-blur-md z-20 pb-safe">
             <button
               type="submit"
               disabled={loading || profiles.length === 0}
@@ -304,13 +362,13 @@ export const TransactionForm = () => {
               {loading ? (
                  <>
                     <div className="w-5 h-5 border-2 border-slate-500 border-t-white rounded-full animate-spin" />
-                    Bóveda Abierta...
+                    Registrando...
                  </>
               ) : 'Registrar en Bóveda'}
             </button>
           </div>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 };

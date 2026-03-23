@@ -132,6 +132,11 @@ export const deleteTransaction = async (userId: string, profileId: string, trans
   await deleteDoc(txRef);
 };
 
+export const updateTransaction = async (userId: string, profileId: string, transactionId: string, data: any) => {
+  const txRef = doc(db, `users/${userId}/profiles/${profileId}/transactions/${transactionId}`);
+  await updateDoc(txRef, data);
+};
+
 export const createObligation = async (userId: string, profileId: string, data: any) => {
   const obRef = collection(db, `users/${userId}/profiles/${profileId}/obligations`);
   await addDoc(obRef, data);

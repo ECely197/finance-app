@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../../store/useAppStore';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { getCategories, deleteTransaction } from '../../lib/firestore';
-import { Search, Trash2, Filter, Tag, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Briefcase, X } from 'lucide-react';
+import { getCategories, deleteTransaction, updateTransaction } from '../../lib/firestore';
+import { Search, Trash2, Pencil, Filter, Tag, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Briefcase, X, CheckCircle } from 'lucide-react';
 
 export const TransactionsView = () => {
   const { user, currentProfile } = useAppStore();
@@ -18,6 +18,15 @@ export const TransactionsView = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  
+  const [toastMsg, setToastMsg] = useState('');
+  const [editingTx, setEditingTx] = useState<any | null>(null);
+  const [editMonto, setEditMonto] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editCat, setEditCat] = useState('');
+  const [editTipo, setEditTipo] = useState('ingreso');
+  const [editDate, setEditDate] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
      if (!user || !currentProfile) return;
@@ -89,6 +98,61 @@ export const TransactionsView = () => {
       }
       return filtered;
   }, [transactions, activeFilter, selectedCategory, startDate, endDate, searchQuery, categories]);
+
+  const { filteredIncome, filteredExpense, filteredBalance, isFiltering } = useMemo(() => {
+     let inc = 0;
+     let exp = 0;
+     
+     filteredList.forEach(t => {
+        if (t.type === 'ingreso') inc += t.amount;
+        else exp += t.amount;
+     });
+
+     const isFil = activeFilter !== 'Todos' || selectedCategory !== 'all' || startDate !== '' || endDate !== '' || searchQuery.trim() !== '';
+
+     return {
+        filteredIncome: inc,
+        filteredExpense: exp,
+        filteredBalance: inc - exp,
+        isFiltering: isFil
+     };
+  }, [filteredList, activeFilter, selectedCategory, startDate, endDate, searchQuery]);
+
+  const handleOpenEdit = (tx: any, evt: React.MouseEvent) => {
+      evt.stopPropagation();
+      setEditingTx(tx);
+      setEditMonto(tx.amount.toString());
+      setEditDesc(tx.description || '');
+      setEditCat(tx.categoryId || '');
+      setEditTipo(tx.type || 'ingreso');
+      
+      const dateObj = tx.date?.toDate ? tx.date.toDate() : new Date(tx.date.seconds * 1000);
+      setEditDate(dateObj.toISOString().split('T')[0]);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+     e.preventDefault();
+     if (!user || !currentProfile || !editingTx || !editMonto || !editCat || !editTipo || !editDate) return;
+     setIsUpdating(true);
+     try {
+       await updateTransaction(user.uid, currentProfile.id, editingTx.id, {
+          amount: parseFloat(editMonto),
+          description: editDesc.trim(),
+          categoryId: editCat,
+          type: editTipo,
+          date: new Date(editDate + 'T12:00:00')
+       });
+       setEditingTx(null);
+       setToastMsg('Transacción actualizada correctamente 🎉');
+       setTimeout(() => setToastMsg(''), 4000);
+     } catch (err) {
+       console.error(err);
+       setToastMsg('Error al actualizar transacción');
+       setTimeout(() => setToastMsg(''), 4000);
+     } finally {
+       setIsUpdating(false);
+     }
+  };
 
   const handleDelete = async (id: string, evt: React.MouseEvent) => {
      evt.stopPropagation();
@@ -209,6 +273,46 @@ export const TransactionsView = () => {
             </div>
       </motion.div>
 
+      {/* Dynamic Summary Banner */}
+      {!loading && filteredList.length > 0 && (
+         <motion.div 
+           key={isFiltering ? 'filtering' : 'all'}
+           initial={{ opacity: 0, y: -10 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ duration: 0.4, ease: "easeOut" }}
+           className="bg-white rounded-[2.5rem] p-5 lg:px-6 shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6"
+         >
+            <div className="flex items-center gap-4">
+               <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center shrink-0 ${isFiltering ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}>
+                  {isFiltering ? <Filter size={24} strokeWidth={2.5}/> : <Briefcase size={24} strokeWidth={2.5}/>}
+               </div>
+               <div>
+                  <h4 className="text-sm xl:text-base font-extrabold text-slate-800">{isFiltering ? 'Resumen de la búsqueda' : 'Resumen Total del Perfil'}</h4>
+                  <p className="text-xs font-bold text-slate-400 mt-0.5">{filteredList.length} registros encontrados</p>
+               </div>
+            </div>
+
+            <div className="flex items-center gap-4 sm:gap-6 md:ml-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+               <div className="flex flex-col items-end shrink-0">
+                  <span className="text-[10px] sm:text-xs font-black uppercase text-slate-400 tracking-widest">Ingresos</span>
+                  <span className="text-sm sm:text-base font-extrabold text-emerald-600">+{formatCurrency(filteredIncome)}</span>
+               </div>
+               <div className="hidden sm:block w-px h-8 bg-slate-100 shrink-0"></div>
+               <div className="flex flex-col items-end shrink-0">
+                  <span className="text-[10px] sm:text-xs font-black uppercase text-slate-400 tracking-widest">Egresos</span>
+                  <span className="text-sm sm:text-base font-extrabold text-rose-500">-{formatCurrency(filteredExpense)}</span>
+               </div>
+               <div className="hidden sm:block w-px h-8 bg-slate-100 shrink-0"></div>
+               <div className={`flex flex-col items-end px-4 py-2 rounded-2xl border shrink-0 ${filteredBalance >= 0 ? 'bg-slate-800 border-slate-800' : 'bg-rose-50 border-rose-200'}`}>
+                  <span className={`text-[10px] sm:text-xs font-black uppercase tracking-widest mb-0.5 ${filteredBalance >= 0 ? 'text-slate-300' : 'text-rose-500'}`}>Balance Neto</span>
+                  <span className={`text-base sm:text-lg font-extrabold tracking-tight ${filteredBalance >= 0 ? 'text-white' : 'text-rose-600'}`}>
+                     {filteredBalance >= 0 ? '' : '-'}{formatCurrency(Math.abs(filteredBalance))}
+                  </span>
+               </div>
+            </div>
+         </motion.div>
+      )}
+
       {/* Transactions List */}
       {loading ? (
          <div className="flex justify-center items-center h-64">
@@ -287,15 +391,23 @@ export const TransactionsView = () => {
                               </span>
                               <span className="text-[10px] font-black uppercase text-slate-300 tracking-widest sm:text-right mt-0.5">{tx.type}</span>
                            </div>
-                           
+                           <div className="flex items-center gap-1 shrink-0 mt-1">
+                           <button 
+                             onClick={(e) => handleOpenEdit(tx, e)}
+                             className="p-2 sm:p-2.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-colors shrink-0 outline-none"
+                             title="Editar transacción"
+                           >
+                              <Pencil size={18} strokeWidth={2.5}/>
+                           </button>
                            <button 
                              onClick={(e) => handleDelete(tx.id, e)}
                              disabled={isDeleting}
-                             className="p-3 bg-white hover:bg-rose-50 border border-slate-100 text-slate-300 hover:text-rose-600 rounded-2xl transition-all shadow-sm hover:shadow-rose-500/10 focus:outline-none focus:ring-4 focus:ring-rose-500/10 active:scale-95"
+                             className="p-2 sm:p-2.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors shrink-0 outline-none"
                              title="Eliminar transacción"
                            >
                               {isDeleting ? <div className="w-5 h-5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"/> : <Trash2 size={18} strokeWidth={2.5}/>}
                            </button>
+                         </div>
                         </div>
                      </motion.div>
                    );
@@ -303,6 +415,95 @@ export const TransactionsView = () => {
             </motion.div>
          </div>
       )}
+
+      {/* Edit Modal */}
+      <AnimatePresence>
+         {editingTx && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !isUpdating && setEditingTx(null)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+               <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl relative overflow-hidden z-10 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                 <div className="p-6 sm:p-8">
+                   <div className="flex justify-between items-start mb-6">
+                      <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
+                         <Pencil size={24} strokeWidth={2.5}/>
+                      </div>
+                      <button onClick={() => !isUpdating && setEditingTx(null)} className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors">
+                         <X size={20} />
+                      </button>
+                   </div>
+                   
+                   <h3 className="text-2xl font-extrabold text-slate-800 mb-6">Editar Transacción</h3>
+
+                   <form onSubmit={handleUpdate} className="space-y-4">
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">Tipo</label>
+                        <select required value={editTipo} onChange={e => setEditTipo(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-700">
+                           <option value="ingreso">Ingreso</option>
+                           <option value="gasto_fijo">Gasto Fijo</option>
+                           <option value="gasto_variable">Gasto Variable</option>
+                           <option value="gasto_innecesario">Gasto Innecesario</option>
+                           <option value="inversion">Inversión</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                         <div>
+                           <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">Monto</label>
+                           <div className="relative">
+                              <span className="absolute left-4 top-3.5 text-slate-400 font-bold">$</span>
+                              <input type="number" required min="1" step="1" value={editMonto} onChange={e => setEditMonto(e.target.value)} className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-700" />
+                           </div>
+                         </div>
+                         <div>
+                           <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">Fecha</label>
+                           <input type="date" required value={editDate} onChange={e => setEditDate(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-700" />
+                         </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">Categoría</label>
+                        <select required value={editCat} onChange={e => setEditCat(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-700">
+                           <option value="" disabled>Selecciona una categoría</option>
+                           {Object.entries(categories).map(([id, name]) => (
+                              <option key={id} value={id}>{name}</option>
+                           ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">Descripción</label>
+                        <input type="text" value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Comentario (opcional)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-semibold text-slate-700 placeholder:text-slate-400" />
+                      </div>
+
+                      <div className="pt-4 flex gap-3">
+                         <button type="button" onClick={() => setEditingTx(null)} disabled={isUpdating} className="flex-1 py-4 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition-all">
+                            Cancelar
+                         </button>
+                         <button type="submit" disabled={isUpdating || !editMonto || !editCat || !editTipo || !editDate} className="flex-[2] flex items-center justify-center gap-2 py-4 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] disabled:opacity-70">
+                            {isUpdating ? <div className="w-5 h-5 border-2 border-slate-200 border-t-white rounded-full animate-spin" /> : 'Guardar Cambios'}
+                         </button>
+                      </div>
+                   </form>
+                 </div>
+               </motion.div>
+            </div>
+         )}
+      </AnimatePresence>
+
+      {/* Global Toast Notification */}
+      <AnimatePresence>
+         {toastMsg && (
+            <motion.div 
+              initial={{ opacity: 0, y: 50, scale: 0.9 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed bottom-6 right-6 md:bottom-10 md:right-10 z-[200] bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-[0_10px_40px_rgba(16,185,129,0.3)] font-bold flex items-center gap-3"
+            >
+               <CheckCircle size={20} strokeWidth={2.5} />
+               {toastMsg}
+            </motion.div>
+         )}
+      </AnimatePresence>
 
     </div>
   );

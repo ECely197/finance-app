@@ -17,6 +17,7 @@ export const SettingsView = () => {
   // Category state
   const [categories, setCategories] = useState<any[]>([]);
   const [newCatName, setNewCatName] = useState('');
+  const [newCatType, setNewCatType] = useState('gasto');
   
   const [loading, setLoading] = useState(false);
 
@@ -81,8 +82,8 @@ export const SettingsView = () => {
      try {
        const id = crypto.randomUUID();
        const formattedName = newCatName.trim();
-       await createCategory(user.uid, currentProfile.id, id, formattedName, 'general');
-       setCategories([...categories, { id, name: formattedName, type: 'general' }]);
+       await createCategory(user.uid, currentProfile.id, id, formattedName, newCatType);
+       setCategories([...categories, { id, name: formattedName, type: newCatType }]);
        setNewCatName('');
      } catch (err) { console.error(err); }
      finally { setLoading(false); }
@@ -203,8 +204,8 @@ export const SettingsView = () => {
            </p>
          </div>
 
-         <form onSubmit={handleCreateCategory} className="flex gap-3 mb-8">
-            <div className="relative flex-1">
+         <form onSubmit={handleCreateCategory} className="flex flex-col md:flex-row gap-3 mb-8">
+            <div className="relative flex-[2]">
               <Tag size={18} className="absolute left-4 top-3.5 text-slate-400 pointer-events-none" />
               <input 
                 type="text" 
@@ -215,9 +216,18 @@ export const SettingsView = () => {
                 className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-semibold text-slate-800"
               />
             </div>
+            <select 
+              value={newCatType} 
+              onChange={e => setNewCatType(e.target.value)}
+              className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-slate-700 appearance-none cursor-pointer"
+            >
+               <option value="gasto">Gasto / Salida</option>
+               <option value="ingreso">Ingreso / Venta</option>
+               <option value="general">Mixto (General)</option>
+            </select>
             <button 
               type="submit" disabled={loading || !newCatName.trim()} 
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-2xl transition-all disabled:opacity-50 active:scale-95 shadow-sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-2xl transition-all disabled:opacity-50 active:scale-95 shadow-sm shrink-0"
             >
               Agregar
             </button>
@@ -240,6 +250,7 @@ export const SettingsView = () => {
                      exit={{ opacity: 0, scale: 0.8 }}
                      className="group flex items-center gap-2 bg-slate-50 border border-slate-200 pl-4 pr-1.5 py-1.5 rounded-full"
                    >
+                     <div className={`w-2 h-2 rounded-full shrink-0 ${!cat.type || cat.type === 'general' ? 'bg-slate-400' : cat.type === 'ingreso' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                      <span className="font-bold text-slate-700 text-sm">{cat.name}</span>
                      <button 
                        type="button" 

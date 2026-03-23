@@ -7,7 +7,6 @@ import { useAppStore } from './store/useAppStore';
 
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthForm } from './components/auth/AuthForm';
-import { TransactionForm } from './components/transactions/TransactionForm';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { OnboardingProfile } from './components/auth/OnboardingProfile';
 import { SettingsView } from './components/settings/SettingsView';
@@ -66,11 +65,6 @@ function App() {
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardView />} />
-            <Route path="add" element={
-              <div className="py-2">
-                <TransactionForm />
-              </div>
-            } />
             <Route path="transactions" element={<TransactionsView />} />
             <Route path="investments" element={<InvestmentsView />} />
             <Route path="obligations" element={<ObligationsView />} />

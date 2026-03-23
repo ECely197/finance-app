@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ComposedChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useAppStore } from '../../store/useAppStore';
 import { useDashboardData } from '../../hooks/useDashboardData';
-import { Wallet, CreditCard, DollarSign, Activity, Calendar as CalendarIcon, Filter, X, ArrowUpRight, ArrowDownRight, Tag } from 'lucide-react';
+import { Wallet, CreditCard, DollarSign, Activity, Calendar as CalendarIcon, Filter, X, ArrowUpRight, ArrowDownRight, Tag, TrendingDown, Briefcase } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
 
@@ -77,12 +77,25 @@ export const DashboardView = () => {
     let income = 0;
     let fixedExp = 0;
     let varExp = 0;
+    let unnecExp = 0;
+    let investmentsTotal = 0;
+
     transactions.forEach(tx => {
       if (tx.type === 'ingreso') income += tx.amount;
       else if (tx.type === 'gasto_fijo') fixedExp += tx.amount;
-      else if (tx.type === 'gasto_variable' || tx.type === 'gasto_innecesario') varExp += tx.amount;
+      else if (tx.type === 'gasto_variable') varExp += tx.amount;
+      else if (tx.type === 'gasto_innecesario') unnecExp += tx.amount;
+      else if (tx.type === 'inversion') investmentsTotal += tx.amount;
     });
-    return { income, fixedExp, varExp, balance: income - (fixedExp + varExp) };
+    
+    return { 
+       income, 
+       fixedExp, 
+       varExp, 
+       unnecExp, 
+       investmentsTotal, 
+       balance: income - (fixedExp + varExp + unnecExp + investmentsTotal) 
+    };
   }, [transactions]);
 
   // Daily Evolution Composed Chart
@@ -263,37 +276,57 @@ export const DashboardView = () => {
           <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6">
             
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
-              <motion.div variants={itemVariants} className="bg-white p-6 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
-                <div className="flex justify-between items-start mb-4">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Ingresos Totales</p>
-                  <div className="p-2.5 bg-emerald-50 text-emerald-500 rounded-xl group-hover:scale-110 transition-transform"><Wallet size={20} strokeWidth={2.5}/></div>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+              <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
+                <div className="flex justify-between items-start mb-3">
+                  <p className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">Ingresos</p>
+                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform"><Wallet size={18} strokeWidth={2.5}/></div>
                 </div>
-                <p className="text-3xl font-extrabold text-slate-800 tracking-tight">{formatCurrency(metrics.income)}</p>
+                <p className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight truncate">{formatCurrency(metrics.income)}</p>
               </motion.div>
               
-              <motion.div variants={itemVariants} className="bg-white p-6 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
-                <div className="flex justify-between items-start mb-4">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Gastos Fijos</p>
-                  <div className="p-2.5 bg-blue-50 text-blue-500 rounded-xl group-hover:scale-110 transition-transform"><CreditCard size={20} strokeWidth={2.5}/></div>
+              <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
+                <div className="flex justify-between items-start mb-3">
+                  <p className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">G. Fijos</p>
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform"><CreditCard size={18} strokeWidth={2.5}/></div>
                 </div>
-                <p className="text-3xl font-extrabold text-slate-800 tracking-tight">{formatCurrency(metrics.fixedExp)}</p>
+                <p className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight truncate">-{formatCurrency(metrics.fixedExp)}</p>
               </motion.div>
 
-              <motion.div variants={itemVariants} className="bg-white p-6 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
-                <div className="flex justify-between items-start mb-4">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Gts Variables</p>
-                  <div className="p-2.5 bg-amber-50 text-amber-500 rounded-xl group-hover:scale-110 transition-transform"><Activity size={20} strokeWidth={2.5}/></div>
+              <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
+                <div className="flex justify-between items-start mb-3">
+                  <p className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">G. Variables</p>
+                  <div className="p-2 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform"><Activity size={18} strokeWidth={2.5}/></div>
                 </div>
-                <p className="text-3xl font-extrabold text-slate-800 tracking-tight">{formatCurrency(metrics.varExp)}</p>
+                <p className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight truncate">-{formatCurrency(metrics.varExp)}</p>
               </motion.div>
 
-              <motion.div variants={itemVariants} className="bg-gradient-to-br from-slate-800 to-slate-950 p-6 rounded-3xl shadow-xl shadow-slate-900/20 border border-slate-700 flex flex-col justify-between">
-                <div className="flex justify-between items-start mb-4">
-                  <p className="text-xs font-black text-slate-300 uppercase tracking-widest">Balance Neto</p>
-                  <div className="p-2.5 bg-slate-700/50 text-emerald-400 rounded-xl backdrop-blur-md"><DollarSign size={20} strokeWidth={2.5}/></div>
+              <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
+                <div className="flex justify-between items-start mb-3">
+                  <p className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">G. Innec.</p>
+                  <div className="p-2 bg-rose-50 text-rose-600 rounded-xl group-hover:scale-110 transition-transform"><TrendingDown size={18} strokeWidth={2.5}/></div>
                 </div>
-                <p className="text-3xl font-extrabold text-white tracking-tight">{formatCurrency(metrics.balance)}</p>
+                <p className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight truncate">-{formatCurrency(metrics.unnecExp)}</p>
+              </motion.div>
+
+              <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
+                <div className="flex justify-between items-start mb-3">
+                  <p className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">Inversiones</p>
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl group-hover:scale-110 transition-transform"><Briefcase size={18} strokeWidth={2.5}/></div>
+                </div>
+                <p className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight truncate">-{formatCurrency(metrics.investmentsTotal)}</p>
+              </motion.div>
+
+              <motion.div variants={itemVariants} className={`p-5 rounded-3xl flex flex-col justify-between shadow-xl border ${
+                  metrics.balance < 0 
+                  ? 'bg-gradient-to-br from-rose-500 to-rose-700 border-rose-600 shadow-rose-900/20' 
+                  : 'bg-gradient-to-br from-slate-800 to-slate-950 border-slate-700 shadow-slate-900/20'
+               }`}>
+                <div className="flex justify-between items-start mb-3">
+                  <p className="text-[11px] sm:text-xs font-black text-slate-300 uppercase tracking-widest">Balance Neto</p>
+                  <div className="p-2 bg-white/10 text-white rounded-xl backdrop-blur-md"><DollarSign size={18} strokeWidth={2.5}/></div>
+                </div>
+                <p className="text-xl sm:text-2xl font-extrabold text-white tracking-tight truncate">{formatCurrency(metrics.balance)}</p>
               </motion.div>
             </div>
 
