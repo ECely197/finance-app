@@ -6,7 +6,7 @@ import { db } from '../../lib/firebase';
 import { getCategories, deleteTransaction, updateTransaction } from '../../lib/firestore';
 import { Search, Trash2, Pencil, Filter, Tag, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Briefcase, X, CheckCircle } from 'lucide-react';
 
-export const TransactionsView = () => {
+export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean }) => {
   const { user, currentProfile } = useAppStore();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [categories, setCategories] = useState<Record<string, string>>({});
@@ -186,13 +186,15 @@ export const TransactionsView = () => {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-6 pb-20">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Historial</h2>
-          <p className="text-slate-500 font-medium mt-1">Explora todos los movimientos de <b>{currentProfile?.name}</b></p>
+    <div className={`w-full max-w-5xl mx-auto space-y-6 ${hideHeader ? '' : 'pb-20'}`}>
+      {!hideHeader && (
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Historial</h2>
+            <p className="text-slate-500 font-medium mt-1">Explora todos los movimientos de <b>{currentProfile?.name}</b></p>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Toolbar / Filters */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-[2rem] p-5 shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">

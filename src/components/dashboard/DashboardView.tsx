@@ -4,8 +4,9 @@ import { ComposedChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Toolti
 import { useAppStore } from '../../store/useAppStore';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import { useObligationsData } from '../../hooks/useObligationsData';
+import { useProjectsData } from '../../hooks/useProjectsData';
 import { useNavigate } from 'react-router-dom';
-import { Wallet, CreditCard, DollarSign, Activity, Calendar as CalendarIcon, Filter, X, ArrowUpRight, ArrowDownRight, Tag, TrendingDown, Briefcase, Target } from 'lucide-react';
+import { Wallet, CreditCard, DollarSign, Activity, Calendar as CalendarIcon, Filter, X, ArrowUpRight, ArrowDownRight, Tag, TrendingDown, Briefcase, Target, CheckSquare } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
 
@@ -58,6 +59,7 @@ export const DashboardView = () => {
 
   const navigate = useNavigate();
   const { processedObligations, loading: obsLoading } = useObligationsData();
+  const { projects, loading: projLoading } = useProjectsData();
   const topUrgentObs = processedObligations.filter(ob => !ob.cumplida).slice(0, 3);
 
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
@@ -255,11 +257,24 @@ export const DashboardView = () => {
     setShowCustom(val === 'custom');
   };
 
+  const greeting = new Date().getHours() < 12 ? 'Buenos días' : new Date().getHours() < 18 ? 'Buenas tardes' : 'Buenas noches';
+  const balanceStr = metrics.balance >= 0 ? `+$${metrics.balance.toLocaleString('es-CO')}` : `-$${Math.abs(metrics.balance).toLocaleString('es-CO')}`;
+  const todayDateStr = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  
+  const urgentProjects = projects.filter(p => p.progress < 100 && p.daysRemaining <= 2);
+  const urgentObligations = processedObligations.filter(o => !o.cumplida && o.daysRemaining <= 2);
+  
+  const timelineItems = [
+     ...urgentProjects.map(p => ({ id: p.id, type: 'proyecto', title: p.titulo, days: p.daysRemaining })),
+     ...urgentObligations.map(o => ({ id: o.id, type: 'meta', title: o.titulo, days: o.daysRemaining }))
+  ].sort((a, b) => a.days - b.days);
+
   return (
     <>
-      <div className="space-y-6 w-full max-w-6xl mx-auto pb-20">
-        {/* Header and Filters */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="w-full relative pb-24">
+      
+      {/* HEADER SECTION (Date Range Filters, Actions) */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4 w-full">
           <div>
             <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Dashboard</h2>
             <p className="text-slate-500 font-medium">{currentProfile?.name}</p>
@@ -287,16 +302,53 @@ export const DashboardView = () => {
           </div>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
+        <AnimatePresence mode="wait">
+        {loading || obsLoading || projLoading ? (
+          <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex justify-center items-center h-64 w-full">
             <div className="flex flex-col items-center gap-4">
               <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
-              <p className="text-slate-400 font-bold animate-pulse">Sincronizando con la nube...</p>
+              <p className="text-slate-400 font-bold animate-pulse">Cargando métricas...</p>
             </div>
-          </div>
+          </motion.div>
         ) : (
-          <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6">
-            
+          <motion.div key="content" variants={containerVariants} initial="hidden" animate="show" className="w-full relative">
+
+            {/* DAILY BRIEFING MODULE */}
+            <motion.div variants={itemVariants} className="w-full bg-slate-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden mb-8 text-white">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+                
+                <div className="relative z-10">
+                    <h2 className="text-3xl font-extrabold mb-3">{greeting}.</h2>
+                    <p className="text-slate-300 text-lg max-w-2xl leading-relaxed">
+                        Hoy es <span className="text-white font-bold capitalize">{todayDateStr}</span>. 
+                        Tienes <span className="text-rose-400 font-bold">{urgentProjects.length} proyectos</span> y <span className="text-amber-400 font-bold">{urgentObligations.length} metas</span> urgentes que vencen pronto, 
+                        y tu balance general en este periodo va en <span className={metrics.balance >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{balanceStr}</span>.
+                    </p>
+
+                    {/* Timeline 48h */}
+                    {timelineItems.length > 0 && (
+                       <div className="mt-8 pt-8 border-t border-slate-700/50">
+                          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-5">Radar 48 Horas</h3>
+                          <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+                              {timelineItems.map(item => (
+                                  <div key={`${item.type}-${item.id}`} className="min-w-[200px] flex-shrink-0 bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-5 rounded-2xl flex flex-col justify-between hover:bg-slate-800 transition-colors">
+                                      <div className="flex items-center gap-2 mb-3">
+                                          {item.type === 'proyecto' ? <CheckSquare size={16} className="text-blue-400"/> : <Target size={16} className="text-amber-400"/>}
+                                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{item.type}</span>
+                                      </div>
+                                      <h4 className="font-bold text-sm text-slate-200 line-clamp-2 mb-3">{item.title}</h4>
+                                      <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded inline-block w-max ${item.days === 0 ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-700 text-slate-300'}`}>
+                                          {item.days === 0 ? 'Vence Hoy' : `En ${item.days} día${item.days !== 1 ? 's' : ''}`}
+                                      </span>
+                                  </div>
+                              ))}
+                          </div>
+                       </div>
+                    )}
+                </div>
+            </motion.div>
+
             {/* KPI Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
               <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
@@ -577,6 +629,7 @@ export const DashboardView = () => {
             )}
           </motion.div>
         )}
+      </AnimatePresence>
       </div>
 
       {/* Daily Transactions Modal */}
@@ -599,7 +652,7 @@ export const DashboardView = () => {
                      <div>
                        <h3 className="text-2xl font-extrabold text-slate-800 tracking-tight">Cierre del Día</h3>
                        <p className="text-slate-500 font-bold mt-1 text-sm bg-blue-50 text-blue-600 inline-block px-3 py-1 rounded-full uppercase tracking-widest">
-                          {selectedDayObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                          {selectedDayObj?.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
                        </p>
                      </div>
                      <button onClick={() => setSelectedDayObj(null)} className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors flex-shrink-0">

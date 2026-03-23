@@ -1,4 +1,4 @@
-import { doc, setDoc, collection, query, where, getDocs, orderBy, Timestamp, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, updateDoc, deleteDoc, addDoc, query, where, Timestamp, writeBatch, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
 
 export interface Profile {
@@ -150,4 +150,86 @@ export const deleteObligation = async (userId: string, profileId: string, obliga
 export const updateObligation = async (userId: string, profileId: string, obligationId: string, data: any) => {
   const obRef = doc(db, `users/${userId}/profiles/${profileId}/obligations/${obligationId}`);
   await updateDoc(obRef, data);
+};
+
+export const createProject = async (userId: string, profileId: string, data: any) => {
+  const projRef = collection(db, `users/${userId}/profiles/${profileId}/projects`);
+  await addDoc(projRef, data);
+};
+
+export const deleteProject = async (userId: string, profileId: string, projectId: string) => {
+  const projRef = doc(db, `users/${userId}/profiles/${profileId}/projects/${projectId}`);
+  await deleteDoc(projRef);
+};
+
+export const updateProject = async (userId: string, profileId: string, projectId: string, data: any) => {
+  const projRef = doc(db, `users/${userId}/profiles/${profileId}/projects/${projectId}`);
+  await updateDoc(projRef, data);
+};
+
+export const createTask = async (userId: string, profileId: string, projectId: string, data: any) => {
+  const taskRef = collection(db, `users/${userId}/profiles/${profileId}/projects/${projectId}/tasks`);
+  await addDoc(taskRef, data);
+};
+
+export const updateTask = async (userId: string, profileId: string, projectId: string, taskId: string, data: any) => {
+  const taskRef = doc(db, `users/${userId}/profiles/${profileId}/projects/${projectId}/tasks/${taskId}`);
+  await updateDoc(taskRef, data);
+};
+
+export const completeTaskWithRecurrence = async (
+  userId: string, 
+  profileId: string, 
+  projectId: string, 
+  task: any // The full task object including id, titulo, isRecurring, recurrenceType, etc.
+) => {
+  const taskRef = doc(db, `users/${userId}/profiles/${profileId}/projects/${projectId}/tasks/${task.id}`);
+  const batch = writeBatch(db);
+
+  // 1. Mark current task as completed
+  batch.update(taskRef, { 
+     isCompleted: true, 
+     completedAt: new Date() 
+  });
+
+  // 2. If it's recurring, clone it with a new date
+  if (task.isRecurring && task.recurrenceType) {
+      let nextDate = new Date(); // default to today
+      if (task.dueDate && task.dueDate.toDate) {
+         nextDate = new Date(task.dueDate.toDate());
+      } else if (task.dueDate instanceof Date) {
+         nextDate = new Date(task.dueDate);
+      }
+
+      if (task.recurrenceType === 'daily') {
+         nextDate.setDate(nextDate.getDate() + 1);
+      } else if (task.recurrenceType === 'weekly') {
+         nextDate.setDate(nextDate.getDate() + 7);
+      } else if (task.recurrenceType === 'monthly') {
+         nextDate.setMonth(nextDate.getMonth() + 1);
+      }
+
+      const newTaskRef = doc(collection(db, `users/${userId}/profiles/${profileId}/projects/${projectId}/tasks`));
+      batch.set(newTaskRef, {
+         titulo: task.titulo,
+         isCompleted: false,
+         createdAt: new Date(),
+         dueDate: nextDate,
+         timeOfDay: task.timeOfDay || null,
+         isRecurring: true,
+         recurrenceType: task.recurrenceType
+      });
+  }
+
+  await batch.commit();
+};
+
+export const deleteTask = async (userId: string, profileId: string, projectId: string, taskId: string) => {
+  const taskRef = doc(db, `users/${userId}/profiles/${profileId}/projects/${projectId}/tasks/${taskId}`);
+  await deleteDoc(taskRef);
+};
+
+export const createNote = async (userId: string, profileId: string, data: any) => {
+  const notesRef = collection(db, `users/${userId}/profiles/${profileId}/notes`);
+  await addDoc(notesRef, data);
 };

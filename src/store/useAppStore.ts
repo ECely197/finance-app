@@ -17,6 +17,8 @@ interface AppState {
   setCurrentProfile: (profile: Profile | null) => void;
   isLoading: boolean;
   setIsLoading: (isLoading: boolean) => void;
+  isPomodoroRunning: boolean;
+  setIsPomodoroRunning: (isRunning: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -28,4 +30,6 @@ export const useAppStore = create<AppState>((set) => ({
   setCurrentProfile: (profile) => set({ currentProfile: profile }),
   isLoading: true,
   setIsLoading: (isLoading) => set({ isLoading }),
+  isPomodoroRunning: false,
+  setIsPomodoroRunning: (isPomodoroRunning) => set({ isPomodoroRunning }),
 }));

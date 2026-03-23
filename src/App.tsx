@@ -13,6 +13,7 @@ import { SettingsView } from './components/settings/SettingsView';
 import { InvestmentsView } from './components/investments/InvestmentsView';
 import { TransactionsView } from './components/transactions/TransactionsView';
 import { ObligationsView } from './components/obligations/ObligationsView';
+import { ProjectsView } from './components/projects/ProjectsView';
 
 function App() {
   const { user, setUser, profiles, setProfiles, setCurrentProfile, isLoading, setIsLoading } = useAppStore();
@@ -66,6 +67,7 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardView />} />
             <Route path="transactions" element={<TransactionsView />} />
+            <Route path="projects" element={<ProjectsView />} />
             <Route path="investments" element={<InvestmentsView />} />
             <Route path="obligations" element={<ObligationsView />} />
             <Route path="settings" element={<SettingsView />} />

@@ -1,19 +1,32 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Plus, TrendingUp, Settings, LogOut, ScrollText, Target, X } from 'lucide-react';
+import { LayoutDashboard, Plus, TrendingUp, Settings, LogOut, ScrollText, Target, X, CheckSquare, Moon } from 'lucide-react';
 import { ProfileSelector } from './ProfileSelector';
 import { TransactionForm } from '../transactions/TransactionForm';
+import { GlobalTaskTicker } from './GlobalTaskTicker';
+import { GlobalCommandPalette } from './GlobalCommandPalette';
+import { FocusTimer } from './FocusTimer';
+import { DailyClosingModal } from '../dashboard/DailyClosingModal';
+import { TransactionsView } from '../transactions/TransactionsView';
+import { ProjectsView } from '../projects/ProjectsView';
 import { auth } from '../../lib/firebase';
 import { signOut } from 'firebase/auth';
+import { useAppStore } from '../../store/useAppStore';
 
 export const MainLayout = () => {
   const location = useLocation();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showClosingModal, setShowClosingModal] = useState(false);
+  const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [showTransactionsModal, setShowTransactionsModal] = useState(false);
+
+  const { isPomodoroRunning } = useAppStore();
 
   const navItems = [
     { name: 'Resumen', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Historial', path: '/transactions', icon: ScrollText },
+    { name: 'Proyectos', path: '/projects', icon: CheckSquare },
     { name: 'Metas', path: '/obligations', icon: Target },
     { name: 'Inversiones', path: '/investments', icon: TrendingUp },
     { name: 'Ajustes', path: '/settings', icon: Settings },
@@ -52,7 +65,11 @@ export const MainLayout = () => {
   }, [isModalOpen]);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row text-slate-800 overflow-x-hidden">
+    <>
+      <GlobalCommandPalette />
+      <GlobalTaskTicker />
+      <DailyClosingModal isOpen={showClosingModal} onClose={() => setShowClosingModal(false)} />
+      <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row text-slate-800 overflow-x-hidden pt-1">
       
       {/* Sidebar Desktop */}
       <aside className="hidden md:flex flex-col w-72 bg-white border-r border-slate-100 p-6 fixed h-full z-10 shadow-[2px_0_20px_rgb(0,0,0,0.02)]">
@@ -104,6 +121,13 @@ export const MainLayout = () => {
 
         <div className="mt-auto pt-6 border-t border-slate-100">
           <button 
+            onClick={() => setShowClosingModal(true)}
+            className="flex items-center gap-4 px-4 py-3.5 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all w-full font-medium mb-1"
+          >
+            <Moon size={22} />
+            Cierre de Día
+          </button>
+          <button 
             onClick={handleLogout}
             className="flex items-center gap-4 px-4 py-3.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all w-full font-medium"
           >
@@ -121,7 +145,17 @@ export const MainLayout = () => {
              <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shadow-blue-500/20">F</div>
              <span className="font-bold tracking-tight text-slate-800">FinanceApp</span>
           </div>
-          <div className="ml-auto">
+
+          {/* Quick Capture Hint */}
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-100/50 rounded-lg border border-slate-200 text-slate-400 cursor-text hover:bg-slate-100 transition-colors ml-4 shadow-inner" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}>
+             <span className="text-xs font-semibold mr-2">Captura Rápida...</span>
+             <span className="text-[10px] font-bold bg-white px-1.5 py-0.5 rounded text-slate-500 shadow-sm border border-slate-200">Cmd K</span>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2">
+            <button onClick={() => setShowClosingModal(true)} className="p-2 text-indigo-500 hover:bg-indigo-100 rounded-full transition-colors md:hidden">
+               <Moon size={20} />
+            </button>
             <ProfileSelector />
           </div>
         </header>
@@ -183,9 +217,91 @@ export const MainLayout = () => {
          </div>
       </nav>
 
+      {/* Action Stack (Floating Buttons in bottom-right) */}
+      <div className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-[90] flex flex-col items-end gap-3 pointer-events-none">
+          {/* Projects Button */}
+          <button 
+            onClick={() => setShowProjectsModal(true)}
+            className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white border border-slate-100 text-blue-600 shadow-lg transition-all active:scale-95 pointer-events-auto hover:bg-slate-50"
+            title="Proyectos y Tareas"
+          >
+             <CheckSquare size={22} strokeWidth={2.5} />
+          </button>
+
+          {/* Pomodoro Timer (Managed container inside stack) */}
+          <div className="pointer-events-auto">
+             <FocusTimer />
+          </div>
+      </div>
+
+      {/* FocusLock Overlay */}
+      <AnimatePresence>
+          {isPomodoroRunning && (
+              <motion.div 
+                initial={{ opacity: 0 }} 
+                animate={{ opacity: 1 }} 
+                exit={{ opacity: 0 }} 
+                className="fixed inset-0 z-[998] bg-black/90 backdrop-blur-md pointer-events-auto"
+              />
+          )}
+      </AnimatePresence>
+
+      {/* Global Modals for Instant Navigation */}
+      <AnimatePresence>
+          {showTransactionsModal && (
+             <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-6 lg:p-10">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowTransactionsModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                <motion.div initial={{ y: 50, opacity: 0, scale: 0.95 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 50, opacity: 0, scale: 0.95 }} className="bg-slate-50 relative w-full h-full md:rounded-[3rem] shadow-2xl z-10 overflow-hidden flex flex-col">
+                   <div className="flex justify-between items-center px-8 py-6 bg-white border-b border-slate-100 shrink-0">
+                      <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center"><ScrollText size={20} /></div>
+                         <h2 className="text-xl font-black text-slate-800 tracking-tight">Historial Completo</h2>
+                      </div>
+                      <button onClick={() => setShowTransactionsModal(false)} className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors outline-none"><X size={20} /></button>
+                   </div>
+                   <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-10">
+                      <TransactionsView hideHeader={true} />
+                   </div>
+                </motion.div>
+             </div>
+          )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+          {showProjectsModal && (
+             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  exit={{ opacity: 0 }} 
+                  onClick={() => setShowProjectsModal(false)} 
+                  className="absolute inset-0 bg-black/50 backdrop-blur-sm" 
+                />
+                
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+                  animate={{ scale: 1, opacity: 1, y: 0 }} 
+                  exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                  className="bg-white relative w-full max-w-lg max-h-[90vh] rounded-[2.5rem] shadow-2xl z-10 overflow-hidden flex flex-col p-6"
+                >
+                   <div className="flex justify-between items-center mb-6 shrink-0">
+                      <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center"><CheckSquare size={20} /></div>
+                         <h2 className="text-xl font-black text-slate-800 tracking-tight">Proyectos y Hábitos</h2>
+                      </div>
+                      <button onClick={() => setShowProjectsModal(false)} className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors outline-none"><X size={20} /></button>
+                   </div>
+                   <div className="flex-1 overflow-y-auto custom-scrollbar">
+                      <ProjectsView hideHeader={true} />
+                   </div>
+                </motion.div>
+             </div>
+          )}
+      </AnimatePresence>
+
       {/* Global Transaction Modal (BottomSheet on Mobile, Centered on PC) */}
       <AnimatePresence>
-         {isModalOpen && (
+         {isModalOpen && !isPomodoroRunning && (
             <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
                <motion.div 
                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
@@ -222,5 +338,6 @@ export const MainLayout = () => {
       </AnimatePresence>
       
     </div>
+    </>
   );
 };
