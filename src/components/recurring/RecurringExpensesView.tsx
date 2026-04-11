@@ -18,6 +18,11 @@ export const RecurringExpensesView = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Nuevos campos
+  const [isRecurring, setIsRecurring] = useState(true);
+  const [totalAmount, setTotalAmount] = useState('');
+  const [totalInstallments, setTotalInstallments] = useState('');
+
   useEffect(() => {
     if (user && currentProfile) {
        getCategories(user.uid, currentProfile.id).then(setCategories);
@@ -34,7 +39,10 @@ export const RecurringExpensesView = () => {
           titulo: titulo.trim(),
           monto: Number(monto),
           categoryId,
-          frecuencia
+          frecuencia,
+          isRecurring,
+          totalAmount: !isRecurring ? Number(totalAmount) : null,
+          totalInstallments: !isRecurring ? Number(totalInstallments) : null,
         });
       } else {
         await createRecurringExpense(user.uid, currentProfile.id, {
@@ -42,6 +50,11 @@ export const RecurringExpensesView = () => {
           monto: Number(monto),
           categoryId,
           frecuencia,
+          isRecurring,
+          totalAmount: !isRecurring ? Number(totalAmount) : null,
+          remainingAmount: !isRecurring ? Number(totalAmount) : null,
+          totalInstallments: !isRecurring ? Number(totalInstallments) : null,
+          paidInstallments: 0,
           ultimoPago: null,
           createdAt: new Date()
         });
@@ -56,6 +69,9 @@ export const RecurringExpensesView = () => {
     setMonto('');
     setCategoryId('');
     setFrecuencia('mensual');
+    setIsRecurring(true);
+    setTotalAmount('');
+    setTotalInstallments('');
     setEditingId(null);
     setShowForm(false);
   };
@@ -65,6 +81,9 @@ export const RecurringExpensesView = () => {
     setMonto(expense.monto.toString());
     setCategoryId(expense.categoryId);
     setFrecuencia(expense.frecuencia);
+    setIsRecurring(expense.isRecurring !== undefined ? expense.isRecurring : true);
+    setTotalAmount(expense.totalAmount?.toString() || '');
+    setTotalInstallments(expense.totalInstallments?.toString() || '');
     setEditingId(expense.id);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -125,11 +144,42 @@ export const RecurringExpensesView = () => {
                   <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">Frecuencia</label>
                   <select value={frecuencia} onChange={e => setFrecuencia(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-slate-700">
                     <option value="mensual">Mensual</option>
-                    <option value="semanal" disabled>Semanal (Próximamente)</option>
-                    <option value="anual" disabled>Anual (Próximamente)</option>
                   </select>
                 </div>
-              </div>
+
+                <div className="md:col-span-2">
+                   <label className="block text-[11px] font-black text-slate-400 mb-3 uppercase tracking-widest">Tipo de Obligación</label>
+                   <div className="flex gap-3">
+                      <button 
+                         type="button" 
+                         onClick={() => setIsRecurring(true)}
+                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all border ${isRecurring ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'}`}
+                      >
+                         <RefreshCw size={16} /> Suscripción / Servicio
+                      </button>
+                      <button 
+                         type="button" 
+                         onClick={() => setIsRecurring(false)}
+                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all border ${!isRecurring ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'}`}
+                      >
+                         <RefreshCw rotate={180} size={16} /> Deuda / Préstamo (Con fin)
+                      </button>
+                   </div>
+                </div>
+
+                {!isRecurring && (
+                   <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">Monto Total de la Deuda</label>
+                        <input type="number" required={!isRecurring} value={totalAmount} onChange={e => setTotalAmount(e.target.value)} placeholder="Ej. 10000000" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-slate-700" />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">Número de Cuotas</label>
+                        <input type="number" required={!isRecurring} value={totalInstallments} onChange={e => setTotalInstallments(e.target.value)} placeholder="Ej. 12" className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-bold text-slate-700" />
+                      </div>
+                   </motion.div>
+                )}
+             </div>
 
               <div className="flex justify-end gap-3 mt-4">
                 <button type="button" onClick={resetForm} className="px-5 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-all">Cancelar</button>
@@ -175,10 +225,28 @@ export const RecurringExpensesView = () => {
                       <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 px-2.5 py-0.5 rounded-md border border-slate-100 flex items-center gap-1">
                         <Tag size={10} /> {catName}
                       </span>
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-blue-500 bg-blue-50 px-2.5 py-0.5 rounded-md">
-                        {expense.frecuencia}
+                      <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-md ${expense.isRecurring ? 'text-blue-500 bg-blue-50' : 'text-indigo-500 bg-indigo-50'}`}>
+                        {expense.isRecurring ? 'Fijo/Recurrente' : 'Amortizable'}
                       </span>
                     </div>
+                    
+                    {!expense.isRecurring && expense.totalAmount && (
+                       <div className="mt-3 w-full sm:w-64">
+                          <div className="flex justify-between text-[9px] font-black uppercase text-slate-400 mb-1">
+                             <span>Progreso de Liquidación</span>
+                             <span>{((1 - (expense.remainingAmount || 0) / expense.totalAmount) * 100).toFixed(0)}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                             <div 
+                                className="h-full bg-indigo-500 rounded-full" 
+                                style={{ width: `${(1 - (expense.remainingAmount || 0) / expense.totalAmount) * 100}%` }}
+                             />
+                          </div>
+                          <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tight">
+                             Faltan {formatCurrency(expense.remainingAmount || 0)} para matar esta deuda
+                          </p>
+                       </div>
+                    )}
                   </div>
                 </div>
                 

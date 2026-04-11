@@ -7,12 +7,14 @@ import { useObligationsData } from '../../hooks/useObligationsData';
 import { useRecurringExpenses } from '../../hooks/useRecurringExpenses';
 // import { useRecurringExpenses } from '../../hooks/useRecurringExpenses';
 import { useSeparadosData } from '../../hooks/useSeparadosData';
-import { createTransaction, updateSeparado } from '../../lib/firestore';
+import { createTransaction, updateSeparado, payRecurringExpense } from '../../lib/firestore';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownRight, ArrowUpRight, Filter, Target, Package, Plus, DollarSign, X, Tag, Calendar as CalendarIcon, Clock, ChevronDown, Sunset, ShieldCheck } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Filter, Target, Package, Plus, DollarSign, X, Tag, Calendar as CalendarIcon, Clock, ChevronDown, Sunset, ShieldCheck, CheckCircle2, ChevronUp } from 'lucide-react';
 import { MiniCalendar } from '../ui/MiniCalendar';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
+
+const startOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
 
 const getRangeDates = (range: string, customStart?: string, customEnd?: string) => {
   const now = new Date();
@@ -79,6 +81,9 @@ export const DashboardView = () => {
   const [isAbonando, setIsAbonando] = useState(false);
 
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
+  const [isAccordionOpen, setIsAccordionOpen] = useState(false);
+  const [payingId, setPayingId] = useState<string | null>(null);
+
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
     window.addEventListener('resize', handleResize);
@@ -126,6 +131,20 @@ export const DashboardView = () => {
     const fixedBudget = recurringExpenses.reduce((sum, re) => sum + re.monto, 0);
     const fixedProgress = fixedBudget > 0 ? (fixedPaidMonth / fixedBudget) * 100 : 0;
 
+    const fixedUnpaidMonth = recurringExpenses.reduce((sum, expense) => {
+       const isPaidThisMonth = transactions.some(tx => 
+          tx.type === 'gasto_fijo' && 
+          tx.categoryId === expense.categoryId && 
+          tx.description?.includes(expense.titulo) &&
+          new Date(tx.date?.toDate ? tx.date.toDate() : tx.date.seconds * 1000) >= startOfMonth(new Date())
+       );
+       return isPaidThisMonth ? sum : sum + expense.monto;
+    }, 0);
+
+    const balance = income - (fixedExp + varExp + unnecExp + investmentsTotal);
+    const projectedBalance = balance - fixedUnpaidMonth;
+    const solvencyRatio = income > 0 ? (projectedBalance / income) : 0;
+
     return { 
        income, 
        fixedExp, 
@@ -135,9 +154,12 @@ export const DashboardView = () => {
        fixedPaidMonth,
        fixedBudget,
        fixedProgress,
-       balance: income - (fixedExp + varExp + unnecExp + investmentsTotal) 
+       fixedUnpaidMonth,
+       projectedBalance,
+       solvencyRatio,
+       balance 
     };
-  }, [transactions]);
+  }, [transactions, recurringExpenses]);
 
   // Pending Recurring Expenses (Removed)
   // const totalPendingRec = useMemo(() => pendingRecurring.reduce((sum, exp) => sum + exp.monto, 0), [pendingRecurring]);
@@ -757,11 +779,61 @@ export const DashboardView = () => {
                      </div>
                      <div className="p-3 bg-blue-50 text-blue-500 rounded-[16px]"><DollarSign size={20} strokeWidth={3}/></div>
                   </div>
-                  <span className={`text-4xl font-black tracking-tighter ${metrics.balance < 0 ? 'text-rose-500' : 'text-slate-800'}`}>
-                     {formatCurrency(metrics.balance)}
-                  </span>
                   
-                  <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-slate-100">
+                  <div className="space-y-1 mb-8">
+                     <span className={`text-5xl font-black tracking-tighter ${metrics.balance < 0 ? 'text-rose-500' : 'text-slate-800'}`}>
+                        {formatCurrency(metrics.balance)}
+                     </span>
+                     
+                     <div className="flex flex-col gap-2 pt-4">
+                        <div className="flex items-center justify-between">
+                           <div className="flex flex-col">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Libre Proyectado</span>
+                              <span className={`text-xl font-extrabold ${metrics.projectedBalance < 0 ? 'text-rose-500' : 'text-blue-600'}`}>
+                                 {formatCurrency(metrics.projectedBalance)}
+                              </span>
+                           </div>
+                           
+                           {metrics.fixedUnpaidMonth > 0 && (
+                              <motion.div 
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-xl flex flex-col items-end shrink-0"
+                              >
+                                 <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">Comprometido</span>
+                                 <span className="text-[11px] font-black text-amber-700">-{formatCurrency(metrics.fixedUnpaidMonth)}</span>
+                              </motion.div>
+                           )}
+                        </div>
+
+                        {/* Termómetro de Solvencia */}
+                        <div className="mt-2">
+                           <div className="flex justify-between items-center mb-1.5">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Termómetro de Solvencia</span>
+                              <span className={`text-[9px] font-black uppercase ${
+                                 metrics.solvencyRatio > 0.2 ? 'text-emerald-500' : 
+                                 metrics.solvencyRatio > 0 ? 'text-amber-500' : 'text-rose-500'
+                              }`}>
+                                 {metrics.solvencyRatio > 0.2 ? 'Alta' : metrics.solvencyRatio > 0 ? 'Media' : 'Crítica'}
+                              </span>
+                           </div>
+                           <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner relative">
+                              <motion.div 
+                                 className={`h-full absolute left-0 top-0 rounded-full ${
+                                    metrics.solvencyRatio > 0.2 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 
+                                    metrics.solvencyRatio > 0 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 
+                                    'bg-gradient-to-r from-rose-400 to-rose-500'
+                                 }`}
+                                 initial={{ width: 0 }}
+                                 animate={{ width: `${Math.max(0, Math.min(100, metrics.solvencyRatio * 100))}%` }}
+                                 transition={{ duration: 1.2, ease: "easeOut" }}
+                              />
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 pt-6 border-t border-slate-100">
                      <div>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Ingresos Mes</span>
                         <span className="text-[15px] font-extrabold text-emerald-500">{formatCurrency(metrics.income)}</span>
@@ -773,48 +845,166 @@ export const DashboardView = () => {
                   </div>
                </motion.div>
 
-               {/* Gastos Fijos (Recurring) Progress Card - Restored */}
+               {/* Gastos Fijos (Recurring) Progress Card - Evolución Acordeón */}
                <motion.div 
                  variants={itemVariants} 
-                 whileHover={{ y: -4, scale: 1.01, boxShadow: 'var(--shadow-premium-hover)' }} 
-                 className="bg-white p-8 rounded-[32px] shadow-premium border border-slate-50 transition-material group"
+                 className="bg-white rounded-[32px] shadow-premium border border-slate-50 transition-material group overflow-hidden"
                >
-                  <div className="flex justify-between items-start mb-6">
-                     <div>
-                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Obligaciones</h3>
-                        <p className="text-[15px] font-bold text-slate-600">Gastos Fijos de {new Date().toLocaleDateString('es-CO', { month: 'long' })}</p>
+                  <div 
+                    onClick={() => setIsAccordionOpen(!isAccordionOpen)}
+                    className="p-8 cursor-pointer hover:bg-slate-50/50 transition-colors"
+                  >
+                     <div className="flex justify-between items-start mb-6">
+                        <div>
+                           <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Obligaciones</h3>
+                           <p className="text-[15px] font-bold text-slate-600">Centro de Control de Deuda</p>
+                        </div>
+                        <div className="flex gap-2">
+                           <div className="p-3 bg-indigo-50 text-indigo-500 rounded-[16px]"><ShieldCheck size={20} strokeWidth={3}/></div>
+                           <div className="p-3 bg-slate-50 text-slate-400 rounded-[16px]">
+                              {isAccordionOpen ? <ChevronUp size={20} strokeWidth={3}/> : <ChevronDown size={20} strokeWidth={3}/>}
+                           </div>
+                        </div>
                      </div>
-                     <div className="p-3 bg-indigo-50 text-indigo-500 rounded-[16px] animate-pulse-subtle"><ShieldCheck size={20} strokeWidth={3}/></div>
-                  </div>
-                  
-                  <div className="flex items-baseline gap-2 mb-2">
-                     <span className="text-3xl font-black text-slate-800 tracking-tighter">
-                        {formatCurrency(metrics.fixedPaidMonth)}
-                     </span>
-                     <span className="text-sm font-bold text-slate-400">
-                        / {formatCurrency(metrics.fixedBudget)}
-                     </span>
+                     
+                     <div className="flex items-baseline gap-2 mb-2">
+                        <span className="text-3xl font-black text-slate-800 tracking-tighter">
+                           {formatCurrency(metrics.fixedPaidMonth)}
+                        </span>
+                        <span className="text-sm font-bold text-slate-400">
+                           / {formatCurrency(metrics.fixedBudget)}
+                        </span>
+                     </div>
+
+                     {/* Main Progress Bar */}
+                     <div className="mt-4">
+                        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2">
+                           <span className="text-indigo-600">{metrics.fixedProgress.toFixed(0)}% cubierto este mes</span>
+                           <span className={isAccordionOpen ? "text-indigo-500 font-bold" : "text-slate-300"}>
+                              {isAccordionOpen ? "Cerrar detalles" : "Ver obligaciones"}
+                           </span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner relative">
+                           <motion.div 
+                              className="h-full absolute left-0 top-0 rounded-full bg-gradient-to-r from-indigo-500 to-blue-500"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${metrics.fixedProgress}%` }}
+                              transition={{ duration: 1.5, ease: "easeOut" }}
+                           />
+                        </div>
+                     </div>
                   </div>
 
-                  {/* Progress Bar */}
-                  <div className="mt-4">
-                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2">
-                        <span className="text-indigo-600">{metrics.fixedProgress.toFixed(0)}% cubierto</span>
-                        <span className="text-slate-300">Target</span>
-                     </div>
-                     <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner relative">
+                  <AnimatePresence>
+                     {isAccordionOpen && (
                         <motion.div 
-                           className="h-full absolute left-0 top-0 rounded-full bg-gradient-to-r from-indigo-500 to-blue-500"
-                           initial={{ width: 0 }}
-                           animate={{ width: `${metrics.fixedProgress}%` }}
-                           transition={{ duration: 1.5, ease: "easeOut" }}
-                        />
-                     </div>
-                  </div>
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="px-8 pb-8 border-t border-slate-100 pt-6 bg-slate-50/30"
+                        >
+                           <div className="space-y-4">
+                              {recurringExpenses.length === 0 ? (
+                                 <p className="text-center text-xs text-slate-400 font-bold py-4">No hay obligaciones configuradas.</p>
+                              ) : recurringExpenses.map(expense => {
+                                 const isPaidThisMonth = transactions.some(tx => 
+                                    tx.type === 'gasto_fijo' && 
+                                    tx.categoryId === expense.categoryId && 
+                                    tx.description?.includes(expense.titulo) &&
+                                    new Date(tx.date?.toDate ? tx.date.toDate() : tx.date.seconds * 1000) >= startOfMonth(new Date())
+                                 );
 
-                  <p className="mt-6 text-[11px] font-medium text-slate-400 leading-relaxed">
-                     Has cubierto el <span className="text-indigo-600 font-bold">{metrics.fixedProgress.toFixed(0)}%</span> de tus gastos fijos mensuales. Mantén la disciplina para asegurar tu solvencia.
-                  </p>
+                                 const handlePay = async (e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    if (isPaidThisMonth || payingId) return;
+                                    if (!user || !currentProfile) return;
+                                    
+                                    setPayingId(expense.id);
+                                    try {
+                                       await payRecurringExpense(user.uid, currentProfile.id, expense);
+                                    } catch(err) {
+                                       console.error(err);
+                                    } finally {
+                                       setPayingId(null);
+                                    }
+                                 };
+
+                                 return (
+                                    <div key={expense.id} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm group/item">
+                                       <div className="flex items-center gap-4">
+                                          <button 
+                                            onClick={handlePay}
+                                            disabled={isPaidThisMonth || payingId === expense.id}
+                                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                                              isPaidThisMonth 
+                                              ? 'bg-emerald-50 text-emerald-500 border-emerald-100' 
+                                              : 'bg-slate-50 text-slate-300 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-500 border-transparent shadow-sm'
+                                            } border shrink-0`}
+                                          >
+                                             {payingId === expense.id ? (
+                                                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                             ) : isPaidThisMonth ? (
+                                                <CheckCircle2 size={20} strokeWidth={3}/>
+                                             ) : (
+                                                <div className="w-4 h-4 rounded-full border-2 border-slate-200 group-hover/item:border-blue-300" />
+                                             )}
+                                          </button>
+
+                                          <div className="flex-1 min-w-0">
+                                             <div className="flex justify-between items-center mb-1">
+                                                <h4 className={`text-sm font-black truncate ${isPaidThisMonth ? 'text-slate-400 line-through decoration-slate-300' : 'text-slate-700'}`}>
+                                                   {expense.titulo}
+                                                </h4>
+                                                <span className={`text-sm font-black ${isPaidThisMonth ? 'text-slate-400' : 'text-slate-800'}`}>
+                                                   {formatCurrency(expense.monto)}
+                                                </span>
+                                             </div>
+                                             
+                                             <div className="flex items-center gap-2">
+                                                <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${expense.isRecurring ? 'bg-blue-50 text-blue-500' : 'bg-indigo-50 text-indigo-500'}`}>
+                                                   {expense.isRecurring ? 'Recurrente' : 'Deuda'}
+                                                </span>
+                                                {!expense.isRecurring && expense.totalInstallments && (
+                                                   <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded-md">
+                                                      Cuota {Math.min(expense.totalInstallments, (expense.paidInstallments || 0) + (isPaidThisMonth ? 0 : 0))} de {expense.totalInstallments}
+                                                   </span>
+                                                )}
+                                                {isPaidThisMonth && (
+                                                   <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                                                      Pagado
+                                                   </span>
+                                                )}
+                                             </div>
+
+                                             {/* Deuda Progress Bar Secondary */}
+                                             {!expense.isRecurring && expense.totalAmount && (
+                                                <div className="mt-3">
+                                                   <div className="flex justify-between text-[8px] font-black uppercase text-slate-400 mb-1">
+                                                      <span>Liquidación total</span>
+                                                      <span>{((1 - (expense.remainingAmount || 0) / expense.totalAmount) * 100).toFixed(0)}%</span>
+                                                   </div>
+                                                   <div className="h-1 w-full bg-slate-50 rounded-full overflow-hidden">
+                                                      <motion.div 
+                                                         className="h-full bg-indigo-400 rounded-full"
+                                                         initial={{ width: 0 }}
+                                                         animate={{ width: `${(1 - (expense.remainingAmount || 0) / expense.totalAmount) * 100}%` }}
+                                                      />
+                                                   </div>
+                                                </div>
+                                             )}
+                                          </div>
+                                       </div>
+                                    </div>
+                                 );
+                              })}
+                           </div>
+                           
+                           <p className="mt-6 text-[11px] font-medium text-slate-400 leading-relaxed text-center italic">
+                              Usa los checks para registrar tus pagos al instante. El balance neto se ajustará automáticamente.
+                           </p>
+                        </motion.div>
+                     )}
+                  </AnimatePresence>
                </motion.div>
             </div> {/* End Right Sidebar */}
             {/* Fin 3-Column Layout */}

@@ -274,3 +274,48 @@ export const deleteSeparado = async (userId: string, profileId: string, separado
   const ref = doc(db, `users/${userId}/profiles/${profileId}/separados/${separadoId}`);
   await deleteDoc(ref);
 };
+
+/**
+ * Registra el pago de una obligación recurrente o deuda.
+ * 1. Crea la transacción en el historial.
+ * 2. Actualiza el gasto recurrente (ultimoPago, remainingAmount, paidInstallments).
+ */
+export const payRecurringExpense = async (
+  userId: string, 
+  profileId: string, 
+  expense: any // RecurringExpense extendido
+) => {
+  const batch = writeBatch(db);
+  
+  // 1. Crear la transacción
+  const txRef = doc(collection(db, `users/${userId}/profiles/${profileId}/transactions`));
+  const now = new Date();
+  
+  batch.set(txRef, {
+    amount: expense.monto,
+    type: 'gasto_fijo',
+    date: now,
+    categoryId: expense.categoryId,
+    description: `Pago: ${expense.titulo}${!expense.isRecurring ? ` (Cuota ${ (expense.paidInstallments || 0) + 1 })` : ''}`,
+    createdAt: now
+  });
+
+  // 2. Actualizar el gasto recurrente
+  const expenseRef = doc(db, `users/${userId}/profiles/${profileId}/recurring_expenses/${expense.id}`);
+  const updateData: any = {
+    ultimoPago: now
+  };
+
+  // Si es una deuda amortizable
+  if (!expense.isRecurring) {
+    const currentPaid = expense.paidInstallments || 0;
+    const currentRemaining = expense.remainingAmount || 0;
+    
+    updateData.paidInstallments = currentPaid + 1;
+    updateData.remainingAmount = Math.max(0, currentRemaining - expense.monto);
+  }
+
+  batch.update(expenseRef, updateData);
+
+  await batch.commit();
+};

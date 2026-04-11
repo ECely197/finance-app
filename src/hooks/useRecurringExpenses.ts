@@ -11,6 +11,12 @@ export interface RecurringExpense {
   frecuencia: string;
   ultimoPago: Date | null;
   createdAt?: Date;
+  // Campos de Deuda
+  isRecurring: boolean; // True: infinito (arriendo), False: deuda con fin
+  totalAmount?: number;
+  remainingAmount?: number;
+  totalInstallments?: number;
+  paidInstallments?: number;
 }
 
 export const useRecurringExpenses = () => {
