@@ -520,18 +520,18 @@ export const DashboardView = () => {
                           transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
                           className="overflow-hidden"
                         >
-                          <div className=\"mt-1 pt-3 px-1 border-t border-slate-100\">
-                            <div className=\"flex flex-col gap-2 mb-3\">
+                          <div className="mt-1 pt-3 px-1 border-t border-slate-100">
+                            <div className="flex flex-col gap-2 mb-3">
                               {/* Trigger Buttons for Calendar Selection */}
-                              <div className=\"grid grid-cols-2 gap-2\">
+                              <div className="grid grid-cols-2 gap-2">
                                 <button
                                   onClick={() => setActiveDateField(activeDateField === 'start' ? null : 'start')}
                                   className={`flex flex-col items-start px-3 py-2 rounded-2xl border transition-all ${
                                     activeDateField === 'start' ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 bg-slate-50'
                                   }`}
                                 >
-                                  <span className=\"text-[9px] font-black text-slate-400 uppercase tracking-widest\">Desde</span>
-                                  <span className=\"text-xs font-bold text-slate-700\">{customStart || '00/00/00'}</span>
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Desde</span>
+                                  <span className="text-xs font-bold text-slate-700">{customStart || '00/00/00'}</span>
                                 </button>
                                 <button
                                   onClick={() => setActiveDateField(activeDateField === 'end' ? null : 'end')}
@@ -539,8 +539,8 @@ export const DashboardView = () => {
                                     activeDateField === 'end' ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 bg-slate-50'
                                   }`}
                                 >
-                                  <span className=\"text-[9px] font-black text-slate-400 uppercase tracking-widest\">Hasta</span>
-                                  <span className=\"text-xs font-bold text-slate-700\">{customEnd || '00/00/00'}</span>
+                                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hasta</span>
+                                  <span className="text-xs font-bold text-slate-700">{customEnd || '00/00/00'}</span>
                                 </button>
                               </div>
 
@@ -551,7 +551,7 @@ export const DashboardView = () => {
                                     initial={{ opacity: 0, scale: 0.95, y: -5 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                                    className=\"mt-1\"
+                                    className="mt-1"
                                   >
                                     <MiniCalendar 
                                       selectedDate={activeDateField === 'start' ? customStart : customEnd}
@@ -577,7 +577,7 @@ export const DashboardView = () => {
                                 }}
                                 whileTap={{ scale: 0.96 }}
                                 disabled={!customStart || !customEnd}
-                                className=\"w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-sm transition-colors mt-1 shadow-lg shadow-blue-500/20\"
+                                className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-sm transition-colors mt-1 shadow-lg shadow-blue-500/20"
                               >
                                 Aplicar rango
                               </motion.button>
