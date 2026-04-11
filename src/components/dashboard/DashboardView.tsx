@@ -4,12 +4,12 @@ import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as
 import { useAppStore } from '../../store/useAppStore';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import { useObligationsData } from '../../hooks/useObligationsData';
-// import { useProjectsData } from '../../hooks/useProjectsData';
+import { useRecurringExpenses } from '../../hooks/useRecurringExpenses';
 // import { useRecurringExpenses } from '../../hooks/useRecurringExpenses';
 import { useSeparadosData } from '../../hooks/useSeparadosData';
 import { createTransaction, updateSeparado } from '../../lib/firestore';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownRight, ArrowUpRight, Filter, Target, Package, Plus, DollarSign, X, Tag, Calendar as CalendarIcon, Clock, ChevronDown, Sunset } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Filter, Target, Package, Plus, DollarSign, X, Tag, Calendar as CalendarIcon, Clock, ChevronDown, Sunset, ShieldCheck } from 'lucide-react';
 import { MiniCalendar } from '../ui/MiniCalendar';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
@@ -65,8 +65,7 @@ export const DashboardView = () => {
 
   const navigate = useNavigate();
   const { processedObligations, loading: obsLoading } = useObligationsData();
-  // const { projects } = useProjectsData();
-  // const { recurringExpenses } = useRecurringExpenses();
+  const { recurringExpenses } = useRecurringExpenses();
   const { separados, loading: sepLoading } = useSeparadosData();
   
   const topUrgentObs = processedObligations.filter(ob => !ob.cumplida).slice(0, 3);
@@ -120,12 +119,22 @@ export const DashboardView = () => {
       else if (tx.type === 'inversion') investmentsTotal += tx.amount;
     });
     
+    const fixedPaidMonth = transactions
+      .filter(tx => tx.type === 'gasto_fijo')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
+    const fixedBudget = recurringExpenses.reduce((sum, re) => sum + re.monto, 0);
+    const fixedProgress = fixedBudget > 0 ? (fixedPaidMonth / fixedBudget) * 100 : 0;
+
     return { 
        income, 
        fixedExp, 
        varExp, 
        unnecExp, 
        investmentsTotal, 
+       fixedPaidMonth,
+       fixedBudget,
+       fixedProgress,
        balance: income - (fixedExp + varExp + unnecExp + investmentsTotal) 
     };
   }, [transactions]);
@@ -735,33 +744,78 @@ export const DashboardView = () => {
 
             {/* LADO DERECHO: CONTEXTO GENERAL & BALANCE */}
             <div className="flex flex-col gap-6">
-              <motion.div 
-                variants={itemVariants} 
-                whileHover={{ y: -4, scale: 1.01, boxShadow: 'var(--shadow-premium-hover)' }} 
-                className="bg-white p-8 rounded-[32px] shadow-premium border border-slate-50 sticky top-8 transition-material group"
-              >
-                 <div className="flex justify-between items-start mb-6">
-                    <div>
-                       <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Tu Dinero</h3>
-                       <p className="text-[15px] font-bold text-slate-600">Balance Neto Actual</p>
-                    </div>
-                    <div className="p-3 bg-blue-50 text-blue-500 rounded-[16px]"><DollarSign size={20} strokeWidth={3}/></div>
-                 </div>
-                 <span className={`text-4xl font-black tracking-tighter ${metrics.balance < 0 ? 'text-rose-500' : 'text-slate-800'}`}>
-                    {formatCurrency(metrics.balance)}
-                 </span>
-                 
-                 <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-slate-100">
-                    <div>
-                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Ingresos Mes</span>
-                       <span className="text-[15px] font-extrabold text-emerald-500">{formatCurrency(metrics.income)}</span>
-                    </div>
-                    <div>
-                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Gastos Mes</span>
-                       <span className="text-[15px] font-extrabold text-slate-600">-{formatCurrency(metrics.fixedExp + metrics.varExp + metrics.unnecExp)}</span>
-                    </div>
-                 </div>
-              </motion.div>
+               {/* Balance Neto Card */}
+               <motion.div 
+                 variants={itemVariants} 
+                 whileHover={{ y: -4, scale: 1.01, boxShadow: 'var(--shadow-premium-hover)' }} 
+                 className="bg-white p-8 rounded-[32px] shadow-premium border border-slate-50 transition-material group"
+               >
+                  <div className="flex justify-between items-start mb-6">
+                     <div>
+                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Tu Dinero</h3>
+                        <p className="text-[15px] font-bold text-slate-600">Balance Neto Actual</p>
+                     </div>
+                     <div className="p-3 bg-blue-50 text-blue-500 rounded-[16px]"><DollarSign size={20} strokeWidth={3}/></div>
+                  </div>
+                  <span className={`text-4xl font-black tracking-tighter ${metrics.balance < 0 ? 'text-rose-500' : 'text-slate-800'}`}>
+                     {formatCurrency(metrics.balance)}
+                  </span>
+                  
+                  <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-slate-100">
+                     <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Ingresos Mes</span>
+                        <span className="text-[15px] font-extrabold text-emerald-500">{formatCurrency(metrics.income)}</span>
+                     </div>
+                     <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Gastos Mes</span>
+                        <span className="text-[15px] font-extrabold text-slate-600">-{formatCurrency(metrics.fixedExp + metrics.varExp + metrics.unnecExp)}</span>
+                     </div>
+                  </div>
+               </motion.div>
+
+               {/* Gastos Fijos (Recurring) Progress Card - Restored */}
+               <motion.div 
+                 variants={itemVariants} 
+                 whileHover={{ y: -4, scale: 1.01, boxShadow: 'var(--shadow-premium-hover)' }} 
+                 className="bg-white p-8 rounded-[32px] shadow-premium border border-slate-50 transition-material group"
+               >
+                  <div className="flex justify-between items-start mb-6">
+                     <div>
+                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Obligaciones</h3>
+                        <p className="text-[15px] font-bold text-slate-600">Gastos Fijos de {new Date().toLocaleDateString('es-CO', { month: 'long' })}</p>
+                     </div>
+                     <div className="p-3 bg-indigo-50 text-indigo-500 rounded-[16px] animate-pulse-subtle"><ShieldCheck size={20} strokeWidth={3}/></div>
+                  </div>
+                  
+                  <div className="flex items-baseline gap-2 mb-2">
+                     <span className="text-3xl font-black text-slate-800 tracking-tighter">
+                        {formatCurrency(metrics.fixedPaidMonth)}
+                     </span>
+                     <span className="text-sm font-bold text-slate-400">
+                        / {formatCurrency(metrics.fixedBudget)}
+                     </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="mt-4">
+                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2">
+                        <span className="text-indigo-600">{metrics.fixedProgress.toFixed(0)}% cubierto</span>
+                        <span className="text-slate-300">Target</span>
+                     </div>
+                     <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner relative">
+                        <motion.div 
+                           className="h-full absolute left-0 top-0 rounded-full bg-gradient-to-r from-indigo-500 to-blue-500"
+                           initial={{ width: 0 }}
+                           animate={{ width: `${metrics.fixedProgress}%` }}
+                           transition={{ duration: 1.5, ease: "easeOut" }}
+                        />
+                     </div>
+                  </div>
+
+                  <p className="mt-6 text-[11px] font-medium text-slate-400 leading-relaxed">
+                     Has cubierto el <span className="text-indigo-600 font-bold">{metrics.fixedProgress.toFixed(0)}%</span> de tus gastos fijos mensuales. Mantén la disciplina para asegurar tu solvencia.
+                  </p>
+               </motion.div>
             </div> {/* End Right Sidebar */}
             {/* Fin 3-Column Layout */}
 

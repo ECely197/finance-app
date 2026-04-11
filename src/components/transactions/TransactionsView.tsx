@@ -4,7 +4,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { getCategories, deleteTransaction, updateTransaction } from '../../lib/firestore';
-import { Search, Trash2, Pencil, Filter, Tag, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Briefcase, X, CheckCircle, ChevronDown } from 'lucide-react';
+import { Search, Trash2, Pencil, Filter, Tag, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Briefcase, X, CheckCircle, ChevronDown, Clock } from 'lucide-react';
 import { Ripple } from '../ui/Ripple';
 import { MiniCalendar } from '../ui/MiniCalendar';
 
@@ -148,13 +148,17 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
      if (!user || !currentProfile || !editingTx || !editMonto || !editCat || !editTipo || !editDate) return;
      setIsUpdating(true);
      try {
-       await updateTransaction(user.uid, currentProfile.id, editingTx.id, {
-          amount: parseFloat(editMonto),
-          description: editDesc.trim(),
-          categoryId: editCat,
-          type: editTipo,
-          date: new Date(editDate + 'T12:00:00')
-       });
+        const selectedDate = new Date(editDate + 'T00:00:00');
+        const now = new Date();
+        selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+
+        await updateTransaction(user.uid, currentProfile.id, editingTx.id, {
+           amount: parseFloat(editMonto),
+           description: editDesc.trim(),
+           categoryId: editCat,
+           type: editTipo,
+           date: selectedDate
+        });
        setEditingTx(null);
        setToastMsg('Transacción actualizada correctamente 🎉');
        setTimeout(() => setToastMsg(''), 4000);
@@ -186,7 +190,11 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
   const formatDate = (dateObj: any) => {
      if (!dateObj) return '';
      const d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj.seconds * 1000);
-     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+     
+     const datePart = d.toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
+     const timePart = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+     
+     return `${datePart} • ${timePart}`;
   };
 
   const containerVariants = {
@@ -493,7 +501,10 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
                                   )}
                                </div>
                                <h4 className="text-base font-extrabold text-slate-800 line-clamp-1 mb-1">{tx.description || <span className="text-slate-400 font-semibold italic">Monto sin descripción de detalles.</span>}</h4>
-                               <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5"><CalendarIcon size={12}/> {formatDate(tx.date)}</p>
+                               <p className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wide">
+                                  <Clock size={11} className="text-slate-300" />
+                                  {formatDate(tx.date)}
+                               </p>
                            </div>
                         </div>
 

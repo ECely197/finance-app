@@ -129,10 +129,14 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
          });
       }
 
+      const selectedDate = new Date(date + 'T00:00:00');
+      const now = new Date();
+      selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+
       await createTransaction(user.uid, selectedProfileId, txId, {
         amount: parseFloat(amount),
         type: type as any,
-        date: new Date(date + 'T12:00:00'),
+        date: selectedDate,
         categoryId: categoryId,
         description,
         ...(showInvestmentLink && inversionIdRelacionada ? { inversionIdRelacionada } : {})
