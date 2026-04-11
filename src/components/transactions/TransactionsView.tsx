@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../../store/useAppStore';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { getCategories, deleteTransaction, updateTransaction } from '../../lib/firestore';
-import { Search, Trash2, Pencil, Filter, Tag, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Briefcase, X, CheckCircle } from 'lucide-react';
+import { Search, Trash2, Pencil, Filter, Tag, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Briefcase, X, CheckCircle, ChevronDown } from 'lucide-react';
+import { Ripple } from '../ui/Ripple';
+import { MiniCalendar } from '../ui/MiniCalendar';
 
 export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean }) => {
   const { user, currentProfile } = useAppStore();
@@ -15,9 +17,17 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
   const [activeFilter, setActiveFilter] = useState('Todos');
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // Custom Selectors State
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showCatDropdown, setShowCatDropdown] = useState(false);
+  const catDropdownRef = useRef<HTMLDivElement>(null);
+
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [activeDateField, setActiveDateField] = useState<'start' | 'end' | null>(null);
+  const dateDropdownRef = useRef<HTMLDivElement>(null);
   
   const [toastMsg, setToastMsg] = useState('');
   const [editingTx, setEditingTx] = useState<any | null>(null);
@@ -66,8 +76,11 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
       if (activeFilter !== 'Todos') {
          filtered = filtered.filter(t => {
             if (activeFilter === 'Ingresos') return t.type === 'ingreso';
-            if (activeFilter === 'Inversiones') return t.type === 'inversion';
             if (activeFilter === 'Gastos') return t.type.startsWith('gasto_');
+            if (activeFilter === 'Gastos Fijos') return t.type === 'gasto_fijo';
+            if (activeFilter === 'Gastos Variables') return t.type === 'gasto_variable';
+            if (activeFilter === 'Innecesarios') return t.type === 'gasto_innecesario';
+            if (activeFilter === 'Inversiones') return t.type === 'inversion';
             return true;
          });
       }
@@ -186,7 +199,7 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
   };
 
   return (
-    <div className={`w-full max-w-5xl mx-auto space-y-6 ${hideHeader ? '' : 'pb-20'}`}>
+    <div className={`w-full max-w-5xl mx-auto space-y-6 ${hideHeader ? '' : 'pb-32'}`}>
       {!hideHeader && (
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -197,79 +210,171 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
       )}
 
       {/* Toolbar / Filters */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-[2rem] p-5 shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            
-            {/* Left/Top: Types & Categories */}
-            <div className="flex flex-col md:flex-row md:items-center gap-4 w-full lg:w-auto flex-1">
-               <div className="flex flex-wrap gap-2">
-                  {['Todos', 'Ingresos', 'Gastos', 'Inversiones'].map(filter => (
-                     <button 
-                       key={filter}
-                       onClick={() => setActiveFilter(filter)}
-                       className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all focus:outline-none ${
-                           activeFilter === filter 
-                           ? 'bg-slate-800 text-white shadow-md shadow-slate-800/20' 
-                           : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                       }`}
-                     >
-                        {filter}
-                     </button>
-                  ))}
-               </div>
-               
-               <div className="w-full md:w-52 relative">
-                  <select 
-                     value={selectedCategory}
-                     onChange={(e) => setSelectedCategory(e.target.value)}
-                     className="w-full appearance-none bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 py-2.5 pl-4 pr-10 rounded-2xl font-bold focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 cursor-pointer text-sm"
-                  >
-                     <option value="all">Todas las categorías</option>
-                     {Object.entries(categories).map(([id, name]) => (
-                        <option key={id} value={id}>{name}</option>
-                     ))}
-                  </select>
-                  <Filter size={14} className="absolute right-4 top-3.5 text-slate-400 pointer-events-none" />
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        className="bg-white rounded-[2.5rem] p-6 shadow-[0_8px_40px_rgba(0,0,0,0.02)] border border-slate-100 flex flex-col gap-6"
+      >
+            {/* Top Row: Smart Chips (Type Filters) */}
+            <div className="w-full">
+               <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide md:flex-wrap">
+                  {['Todos', 'Ingresos', 'Gastos Fijos', 'Gastos Variables', 'Innecesarios', 'Inversiones'].map(filter => {
+                     const isActive = activeFilter === filter;
+                     return (
+                        <button 
+                          key={filter}
+                          onClick={() => setActiveFilter(filter)}
+                          className={`px-5 py-2 rounded-full font-bold text-xs whitespace-nowrap transition-all relative overflow-hidden flex-shrink-0 ${
+                              isActive 
+                              ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-500/20 shadow-sm' 
+                              : 'bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                          }`}
+                        >
+                           <Ripple />
+                           {filter}
+                        </button>
+                     );
+                  })}
                </div>
             </div>
 
-            {/* Right/Bottom: Dates & Search */}
-            <div className="flex flex-col md:flex-row md:items-center gap-4 w-full lg:w-auto">
-               
-               <div className="flex items-center gap-2 w-full md:w-auto">
-                  <div className="flex flex-1 items-center bg-slate-50 border border-slate-200 rounded-2xl focus-within:ring-4 focus-within:border-blue-500 focus-within:ring-blue-500/10 focus-within:bg-white transition-all overflow-hidden flex-nowrap">
-                    <input 
-                      type="date" 
-                      value={startDate} 
-                      onChange={e => setStartDate(e.target.value)} 
-                      className="w-full md:w-[130px] px-3 py-2.5 bg-transparent font-bold text-slate-600 text-[13px] outline-none cursor-pointer" 
-                    />
-                    <span className="text-slate-300 font-bold shrink-0">-</span>
-                    <input 
-                      type="date" 
-                      value={endDate} 
-                      onChange={e => setEndDate(e.target.value)} 
-                      className="w-full md:w-[130px] px-3 py-2.5 bg-transparent font-bold text-slate-600 text-[13px] outline-none cursor-pointer" 
-                    />
-                  </div>
-                  {(startDate || endDate) && (
-                     <button 
-                       onClick={() => { setStartDate(''); setEndDate(''); }}
-                       className="p-3 bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-600 rounded-xl transition-colors shrink-0"
-                       title="Limpiar fechas"
+            {/* Bottom Row: Selectors & Search */}
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
+               <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                  
+                  {/* Custom Category Picker */}
+                  <div className="relative w-full sm:w-52" ref={catDropdownRef}>
+                     <button
+                       onClick={() => setShowCatDropdown(!showCatDropdown)}
+                       className="w-full flex items-center justify-between bg-slate-50 hover:bg-slate-100 border border-slate-200/60 text-slate-700 px-4 py-2.5 rounded-2xl font-bold transition-all text-sm group"
                      >
-                        <X size={16} strokeWidth={2.5}/>
+                        <div className="flex items-center gap-2 overflow-hidden">
+                           <Tag size={14} className="text-slate-400 shrink-0" />
+                           <span className="truncate">{selectedCategory === 'all' ? 'Categorías' : categories[selectedCategory]}</span>
+                        </div>
+                        <ChevronDown size={14} className={`text-slate-400 transition-transform ${showCatDropdown ? 'rotate-180' : ''}`} />
                      </button>
-                  )}
+
+                     <AnimatePresence>
+                        {showCatDropdown && (
+                           <motion.div
+                             initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                             animate={{ opacity: 1, scale: 1, y: 0 }}
+                             exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                             className="absolute left-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100 z-[200] p-2 overflow-hidden"
+                           >
+                              <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                                 <button
+                                   onClick={() => { setSelectedCategory('all'); setShowCatDropdown(false); }}
+                                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-left text-sm font-bold ${selectedCategory === 'all' ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50'}`}
+                                 >
+                                    <CheckCircle size={14} className={selectedCategory === 'all' ? 'opacity-100' : 'opacity-0'} />
+                                    Todas las categorías
+                                 </button>
+                                 <div className="h-px bg-slate-50 my-1 mx-2" />
+                                 {Object.entries(categories).map(([id, name]) => (
+                                    <button
+                                      key={id}
+                                      onClick={() => { setSelectedCategory(id); setShowCatDropdown(false); }}
+                                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-left text-sm font-bold ${selectedCategory === id ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50'}`}
+                                    >
+                                       <Tag size={14} className="text-slate-400" />
+                                       <span className="truncate">{name}</span>
+                                    </button>
+                                 ))}
+                              </div>
+                           </motion.div>
+                        )}
+                     </AnimatePresence>
+                  </div>
+
+                  {/* Custom Date Range Picker (Pill) */}
+                  <div className="relative w-full sm:w-auto" ref={dateDropdownRef}>
+                     <button
+                       onClick={() => setShowDateDropdown(!showDateDropdown)}
+                       className="w-full flex items-center gap-3 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 text-slate-700 px-4 py-2.5 rounded-2xl font-bold transition-all text-sm"
+                     >
+                        <CalendarIcon size={14} className="text-slate-400 shrink-0" />
+                        <div className="flex items-center gap-2">
+                           <span className={startDate ? 'text-slate-800' : 'text-slate-400'}>{startDate || 'Inicio'}</span>
+                           <span className="text-slate-300">→</span>
+                           <span className={endDate ? 'text-slate-800' : 'text-slate-400'}>{endDate || 'Fin'}</span>
+                        </div>
+                        {(startDate || endDate) && (
+                           <X 
+                             size={12} 
+                             className="ml-1 text-slate-300 hover:text-rose-500 p-0.5" 
+                             onClick={(e) => { e.stopPropagation(); setStartDate(''); setEndDate(''); }} 
+                           />
+                        )}
+                     </button>
+
+                     <AnimatePresence>
+                        {showDateDropdown && (
+                           <motion.div
+                             initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                             animate={{ opacity: 1, scale: 1, y: 0 }}
+                             exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                             className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-[300px] bg-white rounded-3xl shadow-2xl border border-slate-100 z-[200] p-4 flex flex-col gap-4"
+                           >
+                              <div className="grid grid-cols-2 gap-2">
+                                 <button
+                                   onClick={() => setActiveDateField('start')}
+                                   className={`flex flex-col items-start px-3 py-2 rounded-xl border transition-all ${activeDateField === 'start' ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 bg-slate-50'}`}
+                                 >
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Desde</span>
+                                    <span className="text-xs font-bold text-slate-700">{startDate || '00/00/00'}</span>
+                                 </button>
+                                 <button
+                                   onClick={() => setActiveDateField('end')}
+                                   className={`flex flex-col items-start px-3 py-2 rounded-xl border transition-all ${activeDateField === 'end' ? 'border-blue-500 bg-blue-50/50' : 'border-slate-100 bg-slate-50'}`}
+                                 >
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hasta</span>
+                                    <span className="text-xs font-bold text-slate-700">{endDate || '00/00/00'}</span>
+                                 </button>
+                              </div>
+
+                              <AnimatePresence>
+                                 {activeDateField && (
+                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                                       <MiniCalendar 
+                                         selectedDate={activeDateField === 'start' ? startDate : endDate}
+                                         onSelect={(date) => {
+                                            if (activeDateField === 'start') setStartDate(date);
+                                            else setEndDate(date);
+                                            setActiveDateField(null);
+                                         }}
+                                         onClose={() => {
+                                            if (activeDateField === 'start') setStartDate('');
+                                            else setEndDate('');
+                                            setActiveDateField(null);
+                                         }}
+                                       />
+                                    </motion.div>
+                                 )}
+                              </AnimatePresence>
+
+                              <button 
+                                onClick={() => setShowDateDropdown(false)}
+                                className="w-full py-2.5 bg-blue-500 text-white rounded-xl font-bold text-xs hover:bg-blue-600 transition-colors"
+                              >
+                                Aplicar filtro
+                              </button>
+                           </motion.div>
+                        )}
+                     </AnimatePresence>
+                  </div>
                </div>
 
-               <div className="relative w-full md:w-56 shrink-0">
-                  <Search size={18} className="absolute left-4 top-3 text-slate-400 pointer-events-none" />
+               {/* Search Bar Refined */}
+               <div className="relative w-full lg:w-64 shrink-0 group">
+                  <Search size={16} className="absolute left-4 top-2.5 text-blue-400/50 group-focus-within:text-blue-500 transition-colors pointer-events-none" />
                   <input 
                     type="text" 
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     placeholder="Buscar descripción..." 
-                    className="w-full pl-11 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-semibold text-slate-700 placeholder:text-slate-400 text-sm"
+                    className="w-full pl-11 pr-4 py-2 bg-slate-50/50 hover:bg-slate-100/50 focus:bg-white border border-slate-200/60 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-slate-700 placeholder:text-slate-400 text-xs"
                   />
                </div>
             </div>
@@ -282,32 +387,38 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
            initial={{ opacity: 0, y: -10 }}
            animate={{ opacity: 1, y: 0 }}
            transition={{ duration: 0.4, ease: "easeOut" }}
-           className="bg-white rounded-[2.5rem] p-5 lg:px-6 shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6"
+           className="bg-white rounded-[2.5rem] p-6 lg:p-8 shadow-[0_10px_40px_rgba(0,0,0,0.02)] border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-8"
          >
-            <div className="flex items-center gap-4">
-               <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center shrink-0 ${isFiltering ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}>
-                  {isFiltering ? <Filter size={24} strokeWidth={2.5}/> : <Briefcase size={24} strokeWidth={2.5}/>}
+            <div className="flex items-center gap-5">
+               <div className={`w-16 h-16 rounded-3xl flex items-center justify-center shrink-0 ${isFiltering ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-400'}`}>
+                  {isFiltering ? <Filter size={28} strokeWidth={2.5}/> : <Briefcase size={28} strokeWidth={2.5}/>}
                </div>
                <div>
-                  <h4 className="text-sm xl:text-base font-extrabold text-slate-800">{isFiltering ? 'Resumen de la búsqueda' : 'Resumen Total del Perfil'}</h4>
-                  <p className="text-xs font-bold text-slate-400 mt-0.5">{filteredList.length} registros encontrados</p>
+                  <h4 className="text-base xl:text-lg font-black text-slate-800 tracking-tight">{isFiltering ? 'Resumen de búsqueda' : 'Resumen Total del Perfil'}</h4>
+                  <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">{filteredList.length} registros encontrados</p>
                </div>
             </div>
 
-            <div className="flex items-center gap-4 sm:gap-6 md:ml-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-               <div className="flex flex-col items-end shrink-0">
-                  <span className="text-[10px] sm:text-xs font-black uppercase text-slate-400 tracking-widest">Ingresos</span>
-                  <span className="text-sm sm:text-base font-extrabold text-emerald-600">+{formatCurrency(filteredIncome)}</span>
+            <div className="flex items-center gap-8 md:ml-auto">
+               <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-1.5 mb-1">
+                     <ArrowUpRight size={14} className="text-emerald-500" strokeWidth={3}/>
+                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Ingresos</span>
+                  </div>
+                  <span className="text-lg font-black text-emerald-600">+{formatCurrency(filteredIncome)}</span>
                </div>
-               <div className="hidden sm:block w-px h-8 bg-slate-100 shrink-0"></div>
-               <div className="flex flex-col items-end shrink-0">
-                  <span className="text-[10px] sm:text-xs font-black uppercase text-slate-400 tracking-widest">Egresos</span>
-                  <span className="text-sm sm:text-base font-extrabold text-rose-500">-{formatCurrency(filteredExpense)}</span>
+               
+               <div className="flex flex-col items-end">
+                  <div className="flex items-center gap-1.5 mb-1">
+                     <ArrowDownRight size={14} className="text-rose-400" strokeWidth={3}/>
+                     <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Egresos</span>
+                  </div>
+                  <span className="text-lg font-black text-rose-500">-{formatCurrency(filteredExpense)}</span>
                </div>
-               <div className="hidden sm:block w-px h-8 bg-slate-100 shrink-0"></div>
-               <div className={`flex flex-col items-end px-4 py-2 rounded-2xl border shrink-0 ${filteredBalance >= 0 ? 'bg-slate-800 border-slate-800' : 'bg-rose-50 border-rose-200'}`}>
-                  <span className={`text-[10px] sm:text-xs font-black uppercase tracking-widest mb-0.5 ${filteredBalance >= 0 ? 'text-slate-300' : 'text-rose-500'}`}>Balance Neto</span>
-                  <span className={`text-base sm:text-lg font-extrabold tracking-tight ${filteredBalance >= 0 ? 'text-white' : 'text-rose-600'}`}>
+
+               <div className={`flex flex-col items-end px-6 py-3 rounded-3xl border shrink-0 min-w-[140px] ${filteredBalance >= 0 ? 'bg-slate-900 border-slate-900 shadow-xl shadow-slate-900/10' : 'bg-rose-50 border-rose-100'}`}>
+                  <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${filteredBalance >= 0 ? 'text-slate-400' : 'text-rose-400'}`}>Balance</span>
+                  <span className={`text-xl font-black tracking-tight ${filteredBalance >= 0 ? 'text-white' : 'text-rose-600'}`}>
                      {filteredBalance >= 0 ? '' : '-'}{formatCurrency(Math.abs(filteredBalance))}
                   </span>
                </div>
