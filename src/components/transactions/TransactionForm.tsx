@@ -217,10 +217,10 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
             </div>
           </div>
 
-          {/* 2. Tipo de Operación (Segmented) */}
+          {/* 2. Tipo de Operación (Chips Responsivos) */}
           <div className="space-y-4">
-            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Tipo de Movimiento</label>
-            <div className="bg-slate-50 p-1.5 rounded-[1.8rem] border border-slate-100 flex items-center gap-1">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] px-1">Tipo de Movimiento</label>
+            <div className="flex flex-wrap gap-2">
               {transactionTypes.map((t) => {
                 const isActive = type === t.id;
                 return (
@@ -228,10 +228,10 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                     key={t.id}
                     type="button"
                     onClick={() => setType(t.id)}
-                    className={`flex-1 py-3 px-2 rounded-[1.4rem] text-[11px] font-black uppercase tracking-wider transition-all duration-300
+                    className={`flex-1 min-w-[130px] sm:min-w-[110px] py-3 px-4 rounded-full text-[11px] font-black uppercase tracking-wider transition-all duration-300 border-2
                       ${isActive 
-                        ? 'bg-white text-slate-900 shadow-sm border border-slate-100' 
-                        : 'text-slate-400 hover:text-slate-600'
+                        ? 'bg-blue-50/50 border-blue-500/20 text-blue-700 shadow-sm' 
+                        : 'bg-white border-slate-50 text-slate-400 hover:border-slate-100'
                       }`}
                   >
                     {t.label}
@@ -276,9 +276,9 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
 
           {/* 4. Monto & Separado Details */}
           <div className="space-y-4">
-            <div className="bg-white rounded-[2.2rem] border border-slate-100 p-8 shadow-sm">
+            <div className="bg-white rounded-[2.2rem] border border-slate-100 p-10 shadow-sm">
                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Monto Principal</label>
-               <div className="flex items-center gap-6">
+               <div className="flex items-center gap-6 pr-4">
                   <div className="w-16 h-16 rounded-[1.4rem] bg-blue-50 text-blue-500 flex items-center justify-center shrink-0 shadow-inner">
                      <DollarSign size={32} strokeWidth={2.5} />
                   </div>

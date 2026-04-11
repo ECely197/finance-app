@@ -205,7 +205,7 @@ export const MainLayout = () => {
         Both SVG bar (z-40) and nav icons (z-50) are BELOW both FABs.
       */}
 
-      {/* ── SVG Bar (circle-fitted notch, scales with screen) ── */}
+      {/* ── SVG Bar (Dual-fitted organic notch) ── */}
       <div
         className="md:hidden fixed bottom-0 left-0 w-full z-[40] pointer-events-none"
         style={{ height: '68px' }}
@@ -221,16 +221,6 @@ export const MainLayout = () => {
               <feDropShadow dx="0" dy="-3" stdDeviation="7" floodColor="rgba(0,0,0,0.07)" />
             </filter>
           </defs>
-          {/*
-            Path breakdown (notch centered at x=88.5, depth=65):
-            ─ 0→68: flat top edge (the main bar)
-            ─ 68→82: smooth organic entry L curve downward
-            ─ 82→88.5: sweeping arc to the bottom of the notch (y=65)
-            ─ 88.5→95: symmetric arc exiting the notch bottom
-            ─ 95→100: smooth organic exit back to bar level
-            The tangent at x=68 is horizontal (y stays at 0 from cp1).
-            The tangent at x=100 is near-vertical (exits to top right).
-          */}
           <path
             d="M 0,68 L 0,0 L 68,0
                C 72,0 76,18 82,44
