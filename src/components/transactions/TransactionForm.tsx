@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../../store/useAppStore';
-import { createTransaction, getCategories, getInvestments } from '../../lib/firestore';
+import { createTransaction, getCategories, getInvestments, createSeparado } from '../../lib/firestore';
+import { uploadSeparadoImage } from '../../lib/storage';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { CheckCircle2, DollarSign, Calendar, FileText, Link2, Briefcase, User as UserIcon, Tag, Check } from 'lucide-react';
+import { CheckCircle2, DollarSign, Calendar, Link2, Briefcase, User as UserIcon, Tag, Check, Image as ImageIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const transactionTypes = [
@@ -27,6 +28,11 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
   const [categoryId, setCategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [inversionIdRelacionada, setInversionIdRelacionada] = useState('');
+  
+  // Separados states
+  const [isSeparado, setIsSeparado] = useState(false);
+  const [valorTotal, setValorTotal] = useState('');
+  const [fotoProd, setFotoProd] = useState<File | null>(null);
   
   // Data states
   const [categories, setCategories] = useState<any[]>([]);
@@ -98,6 +104,31 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
     setLoading(true);
     try {
       const txId = crypto.randomUUID();
+      
+      // Separados Logic
+      if (type === 'ingreso' && isSeparado) {
+         if (!valorTotal || Number(valorTotal) <= 0) {
+            setToastMessage('Error: Valor Total inválido para el separado');
+            setTimeout(() => setToastMessage(''), 4000);
+            setLoading(false);
+            return;
+         }
+         
+         let fotoUrl = '';
+         if (fotoProd) {
+            fotoUrl = await uploadSeparadoImage(user.uid, selectedProfileId, fotoProd);
+         }
+
+         await createSeparado(user.uid, selectedProfileId, {
+            fotoUrl,
+            valorTotal: Number(valorTotal),
+            totalAbonado: parseFloat(amount),
+            cliente: description.trim(),
+            estado: 'pendiente',
+            createdAt: new Date()
+         });
+      }
+
       await createTransaction(user.uid, selectedProfileId, txId, {
         amount: parseFloat(amount),
         type: type as any,
@@ -111,6 +142,9 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
       setAmount('');
       setCategoryId('');
       setDescription('');
+      setIsSeparado(false);
+      setValorTotal('');
+      setFotoProd(null);
       
       setSuccessAnim(true);
       setTimeout(() => {
@@ -128,21 +162,21 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col relative min-h-0">
+    <div className="w-full h-full flex flex-col relative overflow-hidden bg-white">
       <AnimatePresence>
         {successAnim && (
            <motion.div 
              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-             className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-[2.5rem]"
+             className="absolute inset-0 z-[60] bg-white/90 backdrop-blur-md flex flex-col items-center justify-center rounded-[2.5rem]"
            >
               <motion.div 
                 initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", bounce: 0.5 }}
-                className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center shadow-[0_10px_40px_rgba(16,185,129,0.4)] text-white mb-4"
+                className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center shadow-[0_10px_40px_rgba(16,185,129,0.3)] text-white mb-6"
               >
                  <Check size={48} strokeWidth={3} />
               </motion.div>
-              <h3 className="text-2xl font-extrabold text-slate-800">¡Bóveda Actualizada!</h3>
-              <p className="text-slate-500 font-bold mt-2">Movimiento registrado</p>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tight">¡Bóveda Actualizada!</h3>
+              <p className="text-slate-500 font-bold mt-2">Movimiento registrado con éxito</p>
            </motion.div>
         )}
         
@@ -151,7 +185,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
             initial={{ opacity: 0, y: 50, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-50 ${toastMessage.includes('Debes') || toastMessage.includes('Error') ? 'bg-rose-600' : 'bg-slate-800'} text-white px-6 py-3.5 rounded-full shadow-lg shadow-slate-800/20 font-bold flex items-center gap-2`}
+            className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[70] ${toastMessage.includes('Debes') || toastMessage.includes('Error') ? 'bg-rose-600' : 'bg-slate-800'} text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold`}
           >
              {!toastMessage.includes('Debes') && !toastMessage.includes('Error') && <CheckCircle2 size={20} className="text-emerald-400" />}
              {toastMessage}
@@ -159,28 +193,22 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
         )}
       </AnimatePresence>
 
-      <div className="w-full flex-1 flex flex-col min-h-0">
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <div className="flex-1 overflow-y-auto px-6 md:px-10 pt-8 pb-32 custom-scrollbar space-y-8">
           
-          <div className="flex-1 overflow-y-auto px-6 md:px-10 pt-4 pb-[80px] custom-scrollbar space-y-8">
-            <div className="mb-2">
-              <h2 className="text-3xl font-extrabold text-slate-800 tracking-tight">Registro</h2>
-              <p className="text-slate-500 font-medium mt-1">Añade un nuevo movimiento.</p>
-            </div>
-          
-          {/* Perfil */}
-          <div>
-            <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Espacio / Perfil</label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* 1. Selector de Espacio */}
+          <div className="space-y-4">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Espacio de Trabajo</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {profiles.map(p => (
                  <button
                    key={p.id}
                    type="button"
                    onClick={() => setSelectedProfileId(p.id)}
-                   className={`flex items-center justify-center gap-2 py-3 px-2 rounded-2xl border-2 transition-all font-bold text-sm
+                   className={`flex items-center justify-center gap-2 py-3.5 px-3 rounded-2xl border-2 transition-all font-bold text-sm
                     ${selectedProfileId === p.id 
-                      ? 'border-blue-600 bg-blue-50/50 text-blue-700 shadow-sm shadow-blue-500/10' 
-                      : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
+                      ? 'border-blue-500 bg-blue-50/30 text-blue-700 shadow-sm' 
+                      : 'border-slate-50 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'}`}
                  >
                     {p.type === 'Business' ? <Briefcase size={18} /> : <UserIcon size={18} />}
                     <span className="truncate">{p.name}</span>
@@ -189,195 +217,237 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
             </div>
           </div>
 
-          {/* Tipo de Movimiento */}
-          <div>
-            <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Tipo de Operación</label>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
-              {transactionTypes.map((t) => (
-                <motion.button
-                  key={t.id}
-                  type="button"
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setType(t.id)}
-                  className={`px-2 py-3 mr-0 rounded-2xl text-[13px] font-bold border-2 transition-all duration-200 truncate shadow-sm
-                    ${type === t.id 
-                      ? `${t.bg} ${t.color} ${t.border}` 
-                      : 'border-slate-100 bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50'
-                    }`}
-                >
-                  {t.label}
-                </motion.button>
-              ))}
-            </div>
-          </div>
-
-          <div className="pt-2">
-            {/* Monto */}
-            <div>
-              <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Monto Total</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <DollarSign size={22} className="text-slate-400" />
-                </div>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  autoFocus
-                  step="0.01"
-                  min="0"
-                  required
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                  className="w-full pl-10 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-extrabold text-slate-800 text-xl"
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Categorías (Chips) */}
-          <div>
-            <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">¿En qué categoría?</label>
-            {filteredCategories.length === 0 ? (
-               <div className="bg-slate-50 border border-dashed border-slate-300 rounded-3xl p-6 text-center shadow-sm">
-                  <p className="text-slate-500 font-bold mb-3">No hay categorías para este tipo de movimiento.</p>
-                  <button type="button" onClick={() => navigate('/settings')} className="bg-white border border-slate-200 text-slate-700 font-bold px-5 py-2.5 rounded-xl shadow-[0_2px_10px_rgb(0,0,0,0.02)] hover:bg-slate-100 transition-all active:scale-95">
-                     Ir a Ajustes para crearlas
+          {/* 2. Tipo de Operación (Segmented) */}
+          <div className="space-y-4">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Tipo de Movimiento</label>
+            <div className="bg-slate-50 p-1.5 rounded-[1.8rem] border border-slate-100 flex items-center gap-1">
+              {transactionTypes.map((t) => {
+                const isActive = type === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setType(t.id)}
+                    className={`flex-1 py-3 px-2 rounded-[1.4rem] text-[11px] font-black uppercase tracking-wider transition-all duration-300
+                      ${isActive 
+                        ? 'bg-white text-slate-900 shadow-sm border border-slate-100' 
+                        : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                  >
+                    {t.label}
                   </button>
-               </div>
-            ) : (
-               <div className="flex flex-wrap gap-2">
-                 {filteredCategories.map((cat, idx) => {
-                   const isTop = idx < 3;
-                   return (
-                     <motion.button
-                       key={cat.id}
-                       type="button"
-                       whileTap={{ scale: 0.95 }}
-                       onClick={() => setCategoryId(cat.id)}
-                       className={`px-4 py-3 rounded-full font-bold transition-all border flex items-center gap-1.5 ${
-                          categoryId === cat.id 
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/30' 
-                            : isTop
-                              ? 'bg-blue-50/50 border-blue-100 text-blue-700 hover:bg-blue-100'
-                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-sm'
-                       } ${isTop ? 'text-[15px]' : 'text-[13px]'}`}
-                     >
-                       {isTop && <Tag size={14} className={categoryId === cat.id ? 'text-white/80' : 'text-blue-500/50'} />}
-                       {cat.name}
-                     </motion.button>
-                   );
-                 })}
-               </div>
-            )}
+                );
+              })}
+            </div>
           </div>
 
-          {/* Vinculación a Inversión */}
+          {/* 3. Toggle Separados (Condicional) */}
           <AnimatePresence>
-            {showInvestmentLink && (
+            {type === 'ingreso' && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
-                 <div className="pt-2">
-                    <label className="block text-sm font-extrabold text-indigo-500 uppercase tracking-widest mb-3 border-t border-indigo-50 pt-4 mt-2">¿Vincular a Inversión previa? (Para RSI)</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Link2 size={20} className="text-indigo-400" />
+                <div 
+                  className={`flex items-center justify-between p-5 rounded-3xl border-2 transition-all cursor-pointer ${isSeparado ? 'bg-emerald-50/50 border-emerald-500/30' : 'bg-slate-50/50 border-transparent hover:bg-slate-50'}`}
+                  onClick={() => setIsSeparado(!isSeparado)}
+                >
+                   <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-sm transition-colors ${isSeparado ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+                         <Tag size={20} />
                       </div>
-                      <select
-                        value={inversionIdRelacionada}
-                        onChange={(e) => setInversionIdRelacionada(e.target.value)}
-                        className="w-full pl-12 pr-10 py-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 transition-all font-bold text-slate-700 appearance-none cursor-pointer"
-                      >
-                        <option value="">Ingreso Independiente (No vincular)</option>
-                        {investments.map((inv) => (
-                          <option key={inv.id} value={inv.id}>
-                            Inversión: ${inv.amount} - {inv.description || "Capital"}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDownIcon />
-                    </div>
-                 </div>
+                      <div>
+                         <h4 className="font-extrabold text-slate-800 text-sm">Registrar Separado</h4>
+                         <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Abonos y Ventas Especiales</p>
+                      </div>
+                   </div>
+                   <div className={`w-12 h-6 rounded-full p-1 transition-colors ${isSeparado ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+                      <motion.div 
+                        animate={{ x: isSeparado ? 24 : 0 }}
+                        className="w-4 h-4 bg-white rounded-full shadow-md" 
+                      />
+                   </div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Descripción */}
-          <div>
-            <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Descripción (Libre)</label>
-            <div className="relative">
-              <div className="absolute top-4 left-0 pl-4 pointer-events-none">
-                <FileText size={20} className="text-slate-400" />
+          {/* 4. Monto & Separado Details */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-[2.2rem] border border-slate-100 p-8 shadow-sm">
+               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Monto Principal</label>
+               <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 rounded-[1.4rem] bg-blue-50 text-blue-500 flex items-center justify-center shrink-0 shadow-inner">
+                     <DollarSign size={32} strokeWidth={2.5} />
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    required={!isSeparado}
+                    value={amount}
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-transparent text-5xl font-black text-slate-800 placeholder:text-slate-100 outline-none"
+                  />
+               </div>
+            </div>
+
+            <AnimatePresence>
+              {isSeparado && (
+                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="bg-emerald-50/30 border border-emerald-100 rounded-[2.2rem] p-8 space-y-6">
+                   <div>
+                     <label className="block text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3">Valor Total de la Venta</label>
+                     <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                           <DollarSign size={20} className="text-emerald-400" />
+                        </div>
+                        <input
+                           type="number"
+                           required={isSeparado}
+                           value={valorTotal}
+                           onChange={(e) => setValorTotal(e.target.value)}
+                           className="w-full pl-14 pr-6 py-5 bg-white border border-emerald-100 rounded-[1.5rem] focus:outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all font-black text-slate-700 text-xl shadow-sm"
+                           placeholder="0.00"
+                        />
+                     </div>
+                   </div>
+
+                   <div>
+                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Foto del Producto (Opcional)</label>
+                     <label className="flex items-center justify-center gap-3 bg-white border-2 border-dashed border-slate-100 hover:border-emerald-300 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-[1.5rem] py-5 px-6 transition-all cursor-pointer shadow-sm">
+                        <ImageIcon size={22} />
+                        <span className="font-bold text-sm truncate">{fotoProd ? fotoProd.name : 'Subir Imagen'}</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => setFotoProd(e.target.files?.[0] || null)} />
+                     </label>
+                   </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* 5. Categorías */}
+          <div className="space-y-4">
+             <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Categoría</label>
+             {filteredCategories.length === 0 ? (
+                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-3xl p-8 text-center">
+                   <p className="text-slate-400 font-bold mb-4 text-sm">No hay categorías configuradas.</p>
+                   <button type="button" onClick={() => navigate('/settings')} className="bg-white border border-slate-200 text-slate-600 font-bold px-6 py-3 rounded-2xl hover:bg-slate-100 transition-all text-sm shadow-sm">
+                      Configurar Categorías
+                   </button>
+                </div>
+             ) : (
+                <div className="flex flex-wrap gap-2.5">
+                  {filteredCategories.map((cat) => (
+                    <motion.button
+                      key={cat.id}
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setCategoryId(cat.id)}
+                      className={`px-5 py-3 rounded-full font-black text-[10px] uppercase tracking-[0.1em] transition-all border-2
+                        ${categoryId === cat.id 
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20' 
+                          : 'bg-white border-slate-50 text-slate-400 hover:border-slate-200 hover:text-slate-600 shadow-sm'
+                        }`}
+                    >
+                      {cat.name}
+                    </motion.button>
+                  ))}
+                </div>
+             )}
+          </div>
+
+          {/* 6. Detalles Adicionales */}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Descripción / Nota</label>
+              <div className="relative">
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  className="w-full px-6 py-5 bg-slate-50 border border-slate-50 rounded-[1.8rem] focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all font-bold text-slate-700 resize-none text-sm placeholder:text-slate-300"
+                  placeholder={isSeparado ? "Ej. Juan Perez - Tenis Nike 42" : "Ej. Compras de víveres"}
+                />
               </div>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-slate-700 resize-none leading-relaxed"
-                placeholder="Detalles sueltos del registro para identificarlos (ej. Modelo del producto)"
-              />
+            </div>
+
+            {showInvestmentLink && (
+              <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-3">Vincular a Inversión previa (RSI)</label>
+                <div className="relative">
+                  <select
+                    value={inversionIdRelacionada}
+                    onChange={(e) => setInversionIdRelacionada(e.target.value)}
+                    className="w-full pl-6 pr-12 py-5 bg-indigo-50/50 border border-indigo-100 rounded-[1.8rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-bold text-slate-700 appearance-none cursor-pointer text-sm"
+                  >
+                    <option value="">Ingreso Independiente</option>
+                    {investments.map((inv) => (
+                      <option key={inv.id} value={inv.id}>
+                        Inversión: ${inv.amount.toLocaleString()} - {inv.description || "Capital"}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-5 top-1/2 -translate-y-1/2 text-indigo-400 pointer-events-none">
+                    <Link2 size={18} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <button 
+                type="button" 
+                onClick={() => setShowDate(!showDate)} 
+                className="text-[10px] font-black text-blue-500 hover:text-blue-600 uppercase tracking-widest flex items-center gap-2 px-1"
+              >
+                 <Calendar size={14} />
+                 {showDate ? 'Cerrar selector de fecha' : 'Cambiar fecha del registro'}
+              </button>
+              <AnimatePresence>
+                 {showDate && (
+                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pt-4 overflow-hidden">
+                     <input
+                       type="date"
+                       required
+                       value={date}
+                       onChange={(e) => setDate(e.target.value)}
+                       className="w-full px-6 py-5 bg-white border border-slate-100 rounded-[1.5rem] focus:outline-none font-bold text-slate-700 text-sm shadow-sm"
+                     />
+                   </motion.div>
+                 )}
+              </AnimatePresence>
             </div>
           </div>
+        </div>
 
-          {/* Resto de Datos Ocultos (Fecha) */}
-          <div>
-             <button type="button" onClick={() => setShowDate(!showDate)} className="text-sm font-extrabold text-blue-500 hover:text-blue-600 flex items-center gap-2">
-                {showDate ? 'Ocultar fecha manual' : 'Cambiar fecha (Por defecto Hoy)'}
-             </button>
-             <AnimatePresence>
-                {showDate && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="pt-4 overflow-hidden">
-                    <label className="block text-sm font-extrabold text-slate-500 uppercase tracking-widest mb-3">Día de la Operación</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Calendar size={20} className="text-slate-400" />
-                      </div>
-                      <input
-                        type="date"
-                        required
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-bold text-slate-700 cursor-pointer text-lg"
-                      />
-                    </div>
-                  </motion.div>
-                )}
-             </AnimatePresence>
-          </div>
-
-          </div>
-
-          {/* Sticky Footer */}
-          <div className="shrink-0 p-5 md:p-6 border-t border-slate-100 bg-white/95 backdrop-blur-md z-20 pb-safe">
-            <button
-              type="submit"
-              disabled={loading || profiles.length === 0}
-              className="w-full py-4 px-6 bg-slate-900 hover:bg-black text-white font-extrabold rounded-2xl transition-all shadow-xl shadow-slate-900/10 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                 <>
-                    <div className="w-5 h-5 border-2 border-slate-500 border-t-white rounded-full animate-spin" />
-                    Registrando...
-                 </>
-              ) : 'Registrar en Bóveda'}
-            </button>
-          </div>
-        </form>
-      </div>
+        {/* Sticky Footer */}
+        <div className="shrink-0 p-6 md:px-10 border-t border-slate-50 bg-white/80 backdrop-blur-xl flex gap-4">
+          <button
+            type="button"
+            onClick={() => onComplete && onComplete()}
+            className="flex-1 py-5 px-6 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 font-black uppercase tracking-[0.1em] rounded-[1.8rem] transition-all text-[11px]"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={loading || profiles.length === 0}
+            className="flex-[2] py-5 px-6 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-[0.2em] rounded-full transition-all shadow-xl shadow-blue-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3 text-[11px]"
+          >
+            {loading ? (
+               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <CheckCircle2 size={16} />
+                Registrar Movimiento
+              </>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
-
-const ChevronDownIcon = () => (
-  <svg 
-    className="absolute right-4 top-[18px] text-indigo-400 pointer-events-none" 
-    width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-  >
-    <polyline points="6 9 12 15 18 9"></polyline>
-  </svg>
-);

@@ -34,7 +34,8 @@ export const ProjectsView = ({ hideHeader = false }: { hideHeader?: boolean }) =
             titulo: titulo.trim(),
             fechaLimite: fechaLimite ? new Date(fechaLimite + 'T23:59:59') : null,
             fechaInicio: new Date(),
-            createdAt: new Date()
+            createdAt: new Date(),
+            estado: 'todo'
          });
          setTitulo('');
          setFechaLimite('');
@@ -119,20 +120,22 @@ export const ProjectsView = ({ hideHeader = false }: { hideHeader?: boolean }) =
         </div>
       )}
 
-       {/* Add new project button when in modal context */}
-       {hideHeader && (
-         <motion.button 
-           whileHover={{ scale: 1.01 }}
-           whileTap={{ scale: 0.99 }}
-           onClick={() => setShowModal(true)}
-           className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50/50 hover:bg-blue-50 hover:border-blue-200 transition-all group flex flex-col items-center justify-center gap-2 mb-4"
-         >
-            <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
-               <Plus size={20} strokeWidth={3} />
+        {/* Add new project button when in modal context */}
+        {hideHeader && (
+          <motion.button 
+            whileHover={{ scale: 1.01, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setShowModal(true)}
+            className="w-full py-5 rounded-3xl bg-white shadow-[0_2px_16px_rgba(0,0,0,0.04)] border border-slate-100 hover:border-blue-100 hover:shadow-[0_4px_24px_rgba(59,130,246,0.08)] transition-all group flex items-center justify-center gap-3 mb-6"
+          >
+            <div className="w-9 h-9 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500 group-hover:bg-blue-100 transition-colors">
+              <Plus size={18} strokeWidth={2.5} />
             </div>
-            <span className="text-sm font-black text-slate-600 group-hover:text-blue-600 uppercase tracking-widest">Nuevo Proyecto o Hábito</span>
-         </motion.button>
-       )}
+            <span className="text-sm font-bold text-slate-500 group-hover:text-blue-600 uppercase tracking-widest transition-colors">
+              Nuevo Proyecto o Hábito
+            </span>
+          </motion.button>
+        )}
 
        {loading ? (
          <div className="flex justify-center items-center h-64">

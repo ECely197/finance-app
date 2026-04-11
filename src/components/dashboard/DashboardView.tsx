@@ -1,12 +1,15 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ComposedChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useAppStore } from '../../store/useAppStore';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import { useObligationsData } from '../../hooks/useObligationsData';
-import { useProjectsData } from '../../hooks/useProjectsData';
+// import { useProjectsData } from '../../hooks/useProjectsData';
+// import { useRecurringExpenses } from '../../hooks/useRecurringExpenses';
+import { useSeparadosData } from '../../hooks/useSeparadosData';
+import { createTransaction, updateSeparado } from '../../lib/firestore';
 import { useNavigate } from 'react-router-dom';
-import { Wallet, CreditCard, DollarSign, Activity, Calendar as CalendarIcon, Filter, X, ArrowUpRight, ArrowDownRight, Tag, TrendingDown, Briefcase, Target, CheckSquare } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Filter, Target, Package, Plus, DollarSign, X, Tag, Calendar as CalendarIcon, Clock, ChevronDown, Sunset } from 'lucide-react';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
 
@@ -44,12 +47,13 @@ const getRangeDates = (range: string, customStart?: string, customEnd?: string) 
 };
 
 export const DashboardView = () => {
-  const { currentProfile } = useAppStore();
+  const { user, currentProfile } = useAppStore();
   
   const [timeRange, setTimeRange] = useState('last_7_days');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
-  const [showCustom, setShowCustom] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Drill-down Modal State
   const [selectedDayObj, setSelectedDayObj] = useState<Date | null>(null);
@@ -59,8 +63,19 @@ export const DashboardView = () => {
 
   const navigate = useNavigate();
   const { processedObligations, loading: obsLoading } = useObligationsData();
-  const { projects, loading: projLoading } = useProjectsData();
+  // const { projects } = useProjectsData();
+  // const { recurringExpenses } = useRecurringExpenses();
+  const { separados, loading: sepLoading } = useSeparadosData();
+  
   const topUrgentObs = processedObligations.filter(ob => !ob.cumplida).slice(0, 3);
+  
+  // const [payingExpenseId, setPayingExpenseId] = useState<string | null>(null);
+  
+  // Separados Abono UI State
+  const pendingSeparados = separados.filter(s => s.estado === 'pendiente');
+  const [abonoModalId, setAbonoModalId] = useState<string | null>(null);
+  const [abonoMonto, setAbonoMonto] = useState('');
+  const [isAbonando, setIsAbonando] = useState(false);
 
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
   useEffect(() => {
@@ -71,11 +86,11 @@ export const DashboardView = () => {
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+    show: { opacity: 1, transition: { staggerChildren: 0.08, ease: [0.2, 0, 0, 1] as const } }
   };
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } }
+    hidden: { opacity: 0, y: 15, scale: 0.98 },
+    show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.2, 0, 0, 1] as const } }
   };
 
   const handleBarClick = (data: any) => {
@@ -112,6 +127,48 @@ export const DashboardView = () => {
        balance: income - (fixedExp + varExp + unnecExp + investmentsTotal) 
     };
   }, [transactions]);
+
+  // Pending Recurring Expenses (Removed)
+  // const totalPendingRec = useMemo(() => pendingRecurring.reduce((sum, exp) => sum + exp.monto, 0), [pendingRecurring]);
+  // const projectedBalance = metrics.balance - totalPendingRec;
+
+  // const handlePayFixedExpense = async (expense: any) => { ... };
+
+  const handleAbonoSubmit = async (separado: any) => {
+     if (!user || !currentProfile || !abonoMonto || Number(abonoMonto) <= 0) return;
+     setIsAbonando(true);
+     try {
+        const amount = Number(abonoMonto);
+        const newTotal = separado.totalAbonado + amount;
+        const txId = crypto.randomUUID();
+
+        // Registrar ingreso del abono
+        await createTransaction(user.uid, currentProfile.id, txId, {
+           amount,
+           type: 'ingreso',
+           categoryId: 'abono-separado',
+           date: new Date(),
+           description: `Abono a separado: ${separado.cliente}`,
+        });
+
+        const isCompleted = newTotal >= separado.valorTotal;
+        await updateSeparado(user.uid, currentProfile.id, separado.id, {
+           totalAbonado: newTotal,
+           estado: isCompleted ? 'completado' : 'pendiente'
+        });
+
+        if (isCompleted) {
+           // Celebration would happen here
+        }
+
+        setAbonoModalId(null);
+        setAbonoMonto('');
+     } catch(e) {
+        console.error(e);
+     } finally {
+        setIsAbonando(false);
+     }
+  };
 
   // Daily Evolution Composed Chart
   const dailyEvolutionData = useMemo(() => {
@@ -251,23 +308,40 @@ export const DashboardView = () => {
 
   const formatCurrency = (val: number) => `$${val.toLocaleString('es-CO', { minimumFractionDigits: 0 })}`;
 
-  const handleRangeChange = (e: any) => {
-    const val = e.target.value;
+  const handleRangeSelect = useCallback((val: string) => {
     setTimeRange(val);
-    setShowCustom(val === 'custom');
-  };
+    if (val !== 'custom') setShowDropdown(false);
+  }, []);
 
-  const greeting = new Date().getHours() < 12 ? 'Buenos días' : new Date().getHours() < 18 ? 'Buenas tardes' : 'Buenas noches';
-  const balanceStr = metrics.balance >= 0 ? `+$${metrics.balance.toLocaleString('es-CO')}` : `-$${Math.abs(metrics.balance).toLocaleString('es-CO')}`;
-  const todayDateStr = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const rangeOptions = [
+    { value: 'today',       label: 'Hoy',             icon: Clock },
+    { value: 'last_7_days', label: 'Últimos 7 días',  icon: Filter },
+    { value: 'this_month',  label: 'Este mes',         icon: CalendarIcon },
+    { value: 'last_month',  label: 'Mes pasado',       icon: Sunset },
+    { value: 'custom',      label: 'Personalizado...', icon: ChevronDown },
+  ];
+
+  const currentOption = rangeOptions.find(o => o.value === timeRange) ?? rangeOptions[2];
+
+  // const greeting = new Date().getHours() < 12 ? 'Buenos días' : new Date().getHours() < 18 ? 'Buenas tardes' : 'Buenas noches';
+  // const urgentProjects = projects.filter(p => p.progress < 100 && p.daysRemaining <= 2);
+  // const urgentObligations = processedObligations.filter(o => !o.cumplida && o.daysRemaining <= 2);
   
-  const urgentProjects = projects.filter(p => p.progress < 100 && p.daysRemaining <= 2);
-  const urgentObligations = processedObligations.filter(o => !o.cumplida && o.daysRemaining <= 2);
-  
-  const timelineItems = [
-     ...urgentProjects.map(p => ({ id: p.id, type: 'proyecto', title: p.titulo, days: p.daysRemaining })),
-     ...urgentObligations.map(o => ({ id: o.id, type: 'meta', title: o.titulo, days: o.daysRemaining }))
-  ].sort((a, b) => a.days - b.days);
+  // const timelineItems = [
+  //    ...urgentProjects.map(p => ({ id: p.id, type: 'proyecto', title: p.titulo, days: p.daysRemaining })),
+  //    ...urgentObligations.map(o => ({ id: o.id, type: 'meta', title: o.titulo, days: o.daysRemaining }))
+  // ].sort((a, b) => a.days - b.days);
 
   return (
     <>
@@ -280,30 +354,231 @@ export const DashboardView = () => {
             <p className="text-slate-500 font-medium">{currentProfile?.name}</p>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            {showCustom && (
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-2">
-                <input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)} className="px-3 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-600 outline-none focus:ring-4 focus:ring-blue-500/10 cursor-pointer shadow-sm" />
-                <span className="text-slate-400 font-bold">-</span>
-                <input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)} className="px-3 py-3 bg-white border border-slate-200 rounded-2xl font-bold text-slate-600 outline-none focus:ring-4 focus:ring-blue-500/10 cursor-pointer shadow-sm" />
-              </motion.div>
-            )}
-            <div className="relative inline-block w-full sm:w-auto">
-              <select value={timeRange} onChange={handleRangeChange} className="w-full appearance-none bg-white border border-slate-200 text-slate-700 py-3.5 pl-11 pr-12 rounded-2xl font-extrabold focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 shadow-[0_2px_10px_rgb(0,0,0,0.02)] transition-all cursor-pointer">
-                <option value="today">Hoy</option>
-                <option value="last_7_days">Últimos 7 días</option>
-                <option value="this_month">Este mes</option>
-                <option value="last_month">Mes pasado</option>
-                <option value="custom">Personalizado...</option>
-              </select>
-              <Filter size={18} className="absolute left-4 top-4 text-slate-400 pointer-events-none" />
-              <CalendarIcon size={18} className="absolute right-4 top-4 text-slate-400 pointer-events-none" />
-            </div>
-          </div>
-        </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto items-start sm:items-center">
+            {/* ── Custom Floating Popover Filter ─────────────────── */}
+            <div className="relative w-full sm:w-auto" ref={dropdownRef}>
 
+              {/* Pill Trigger */}
+              <motion.button
+                onClick={() => setShowDropdown(prev => !prev)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                className="flex items-center gap-2.5 bg-white border border-slate-100 shadow-sm rounded-full px-4 py-2.5 w-full sm:w-auto cursor-pointer hover:shadow-md transition-shadow"
+              >
+                <Filter size={15} className="text-blue-400 shrink-0" />
+                <span className="font-bold text-slate-700 text-sm">{currentOption.label}</span>
+                {timeRange === 'custom' && customStart && customEnd && (
+                  <span className="text-[11px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">
+                    {customStart.slice(5)} → {customEnd.slice(5)}
+                  </span>
+                )}
+                <motion.div animate={{ rotate: showDropdown ? 180 : 0 }} transition={{ duration: 0.18 }}>
+                  <ChevronDown size={15} className="text-blue-400" />
+                </motion.div>
+              </motion.button>
+
+              {/* Animated Popover Menu */}
+              <AnimatePresence>
+                {showDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.92, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.92, y: -6 }}
+                    transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
+                    className="absolute right-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100/80 z-[200] p-2 overflow-hidden"
+                    style={{ transformOrigin: 'top right' }}
+                  >
+                    {/* Range Options */}
+                    {rangeOptions.map((opt) => {
+                      const IconComp = opt.icon;
+                      const isActive = timeRange === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          onClick={() => handleRangeSelect(opt.value)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all text-left group ${
+                            isActive
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'text-slate-600 hover:bg-sky-50 hover:text-sky-700'
+                          }`}
+                        >
+                          <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                            isActive
+                              ? 'bg-blue-100 text-blue-600'
+                              : 'bg-slate-50 text-slate-400 group-hover:bg-sky-100 group-hover:text-sky-600'
+                          }`}>
+                            <IconComp size={14} strokeWidth={2.5} />
+                          </div>
+                          <span className="font-bold text-sm">{opt.label}</span>
+                          {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                        </button>
+                      );
+                    })}
+
+                    {/* ── Custom Date Range Panel (inline, no native pickers outside) ── */}
+                    <AnimatePresence>
+                      {timeRange === 'custom' && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-1 pt-3 px-1 border-t border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 px-2">
+                              Rango de fechas
+                            </p>
+                            <div className="flex flex-col gap-2">
+                              {/* From date */}
+                              <div className="relative">
+                                <label className="absolute left-3 top-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">Desde</label>
+                                <input
+                                  type="date"
+                                  value={customStart}
+                                  onChange={e => setCustomStart(e.target.value)}
+                                  className="w-full pt-5 pb-2 px-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all cursor-pointer"
+                                />
+                              </div>
+                              {/* To date */}
+                              <div className="relative">
+                                <label className="absolute left-3 top-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">Hasta</label>
+                                <input
+                                  type="date"
+                                  value={customEnd}
+                                  onChange={e => setCustomEnd(e.target.value)}
+                                  className="w-full pt-5 pb-2 px-3 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-200 transition-all cursor-pointer"
+                                />
+                              </div>
+                              {/* Apply button */}
+                              <motion.button
+                                onClick={() => {
+                                  if (customStart && customEnd) setShowDropdown(false);
+                                }}
+                                whileTap={{ scale: 0.96 }}
+                                disabled={!customStart || !customEnd}
+                                className="w-full py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-sm transition-colors mt-1"
+                              >
+                                Aplicar rango
+                              </motion.button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>{/* end flex filter wrapper */}
+        </div>{/* end header section */}
+
+            {/* Separados / Layaways Widget */}
+            {!sepLoading && pendingSeparados.length > 0 && (
+               <motion.div variants={itemVariants} className="w-full mt-4 mb-4">
+                  <div className="flex justify-between items-center mb-6 pl-2">
+                     <div>
+                       <h3 className="text-xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
+                          <Package className="text-emerald-500" strokeWidth={2.5}/>
+                          Productos Separados (Pendientes)
+                       </h3>
+                       <p className="text-sm font-semibold text-slate-400 mt-1">Sigue el progreso de abonos de tus clientes.</p>
+                     </div>
+                  </div>
+
+                  <div className="flex overflow-x-auto gap-5 pb-4 custom-scrollbar snap-x snap-mandatory">
+                     {pendingSeparados.map(sep => {
+                        const falta = sep.valorTotal - sep.totalAbonado;
+                        const progress = Math.min(100, Math.max(0, (sep.totalAbonado / sep.valorTotal) * 100));
+
+                        return (
+                           <div key={sep.id} className="snap-start shrink-0 w-80 bg-white rounded-[2rem] p-5 shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col relative overflow-hidden group hover:shadow-lg hover:border-emerald-100 transition-all">
+                              {/* Background subtle color */}
+                              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/4 pointer-events-none group-hover:bg-emerald-500/10 transition-colors" />
+
+                              <div className="flex items-start gap-4 mb-4 relative z-10">
+                                 {sep.fotoUrl ? (
+                                    <div className="w-16 h-16 rounded-2xl bg-slate-100 shrink-0 overflow-hidden border border-slate-200">
+                                       <img src={sep.fotoUrl} alt={sep.cliente} className="w-full h-full object-cover" />
+                                    </div>
+                                 ) : (
+                                    <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100 text-slate-300">
+                                       <Package size={24} strokeWidth={1.5} />
+                                    </div>
+                                 )}
+                                 <div className="flex-1 min-w-0">
+                                    <h4 className="font-extrabold text-slate-800 text-[15px] truncate">{sep.cliente}</h4>
+                                    <p className="text-[12px] font-bold text-slate-400 tracking-wide mt-0.5">TOTAL: {formatCurrency(sep.valorTotal)}</p>
+                                 </div>
+                              </div>
+
+                              <div className="relative z-10 mb-5">
+                                 <div className="flex justify-between text-[11px] font-black uppercase tracking-widest mb-2">
+                                    <span className="text-emerald-600 truncate">{formatCurrency(sep.totalAbonado)}</span>
+                                    <span className="text-slate-400">Falta {formatCurrency(falta)}</span>
+                                 </div>
+                                 <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden shadow-inner relative">
+                                    <motion.div 
+                                       className="h-full absolute left-0 top-0 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+                                       initial={{ width: 0 }}
+                                       animate={{ width: `${progress}%` }}
+                                       transition={{ duration: 1, ease: "easeOut" }}
+                                    />
+                                 </div>
+                              </div>
+
+                              <div className="mt-auto relative z-10">
+                                 {abonoModalId === sep.id ? (
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-slate-50 rounded-xl p-3 border border-slate-200 shadow-sm flex flex-col gap-2">
+                                       <div className="flex gap-2">
+                                          <div className="relative flex-1">
+                                             <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                                                <DollarSign size={14} className="text-slate-400" />
+                                             </div>
+                                             <input 
+                                                type="number"
+                                                autoFocus
+                                                value={abonoMonto}
+                                                onChange={e => setAbonoMonto(e.target.value)}
+                                                className="w-full pl-7 pr-3 py-2 text-sm font-bold bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                                                placeholder="Monto a abonar"
+                                             />
+                                          </div>
+                                       </div>
+                                       <div className="flex gap-2">
+                                          <button 
+                                             onClick={() => { setAbonoModalId(null); setAbonoMonto(''); }}
+                                             className="flex-1 py-2 text-xs font-bold text-slate-500 hover:bg-slate-200 rounded-lg transition-colors"
+                                          >
+                                             Cancelar
+                                          </button>
+                                          <button 
+                                             onClick={() => handleAbonoSubmit(sep)}
+                                             disabled={isAbonando || !abonoMonto}
+                                             className="flex-1 py-2 text-xs font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors shadow-sm disabled:opacity-50"
+                                          >
+                                             {isAbonando ? '...' : 'Abonar'}
+                                          </button>
+                                       </div>
+                                    </motion.div>
+                                 ) : (
+                                    <button 
+                                       onClick={() => setAbonoModalId(sep.id)}
+                                       className="w-full py-3.5 flex items-center justify-center gap-2 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 text-slate-600 font-bold text-sm rounded-xl transition-all border border-slate-100 hover:border-emerald-200"
+                                    >
+                                       <Plus size={16} strokeWidth={2.5}/> Añadir Abono
+                                    </button>
+                                 )}
+                              </div>
+                           </div>
+                        );
+                     })}
+                  </div>
+               </motion.div>
+            )}
+            
         <AnimatePresence mode="wait">
-        {loading || obsLoading || projLoading ? (
+        {loading || obsLoading ? (
           <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex justify-center items-center h-64 w-full">
             <div className="flex flex-col items-center gap-4">
               <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin" />
@@ -311,130 +586,161 @@ export const DashboardView = () => {
             </div>
           </motion.div>
         ) : (
-          <motion.div key="content" variants={containerVariants} initial="hidden" animate="show" className="w-full relative">
-
-            {/* DAILY BRIEFING MODULE */}
-            <motion.div variants={itemVariants} className="w-full bg-slate-900 rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden mb-8 text-white">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-                
-                <div className="relative z-10">
-                    <h2 className="text-3xl font-extrabold mb-3">{greeting}.</h2>
-                    <p className="text-slate-300 text-lg max-w-2xl leading-relaxed">
-                        Hoy es <span className="text-white font-bold capitalize">{todayDateStr}</span>. 
-                        Tienes <span className="text-rose-400 font-bold">{urgentProjects.length} proyectos</span> y <span className="text-amber-400 font-bold">{urgentObligations.length} metas</span> urgentes que vencen pronto, 
-                        y tu balance general en este periodo va en <span className={metrics.balance >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>{balanceStr}</span>.
-                    </p>
-
-                    {/* Timeline 48h */}
-                    {timelineItems.length > 0 && (
-                       <div className="mt-8 pt-8 border-t border-slate-700/50">
-                          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-5">Radar 48 Horas</h3>
-                          <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
-                              {timelineItems.map(item => (
-                                  <div key={`${item.type}-${item.id}`} className="min-w-[200px] flex-shrink-0 bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-5 rounded-2xl flex flex-col justify-between hover:bg-slate-800 transition-colors">
-                                      <div className="flex items-center gap-2 mb-3">
-                                          {item.type === 'proyecto' ? <CheckSquare size={16} className="text-blue-400"/> : <Target size={16} className="text-amber-400"/>}
-                                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{item.type}</span>
-                                      </div>
-                                      <h4 className="font-bold text-sm text-slate-200 line-clamp-2 mb-3">{item.title}</h4>
-                                      <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded inline-block w-max ${item.days === 0 ? 'bg-rose-500/20 text-rose-400' : 'bg-slate-700 text-slate-300'}`}>
-                                          {item.days === 0 ? 'Vence Hoy' : `En ${item.days} día${item.days !== 1 ? 's' : ''}`}
-                                      </span>
-                                  </div>
-                              ))}
-                          </div>
-                       </div>
-                    )}
-                </div>
-            </motion.div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-              <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
-                <div className="flex justify-between items-start mb-3">
-                  <p className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">Ingresos</p>
-                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl group-hover:scale-110 transition-transform"><Wallet size={18} strokeWidth={2.5}/></div>
-                </div>
-                <p className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight truncate">{formatCurrency(metrics.income)}</p>
-              </motion.div>
+          <motion.div key="content" variants={containerVariants} initial="hidden" animate="show" className="w-full relative lg:grid lg:grid-cols-3 lg:gap-6">
+            
+            {/* LADO IZQUIERDO: CONTENIDO PRINCIPAL (Flujo, Gráficos, Responsabilidades) */}
+            <div className="lg:col-span-2 space-y-10">
               
-              <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
-                <div className="flex justify-between items-start mb-3">
-                  <p className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">G. Fijos</p>
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl group-hover:scale-110 transition-transform"><CreditCard size={18} strokeWidth={2.5}/></div>
+              {/* Evolución Diaria (Area Chart) */}
+              <motion.div 
+                variants={itemVariants} 
+                whileHover={{ y: -4, scale: 1.01, boxShadow: 'var(--shadow-premium-hover)' }} 
+                className="bg-white p-6 md:p-8 rounded-[32px] shadow-premium border-none w-full transition-material group"
+              >
+                <div className="mb-8">
+                  <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Evolución Diaria</h3>
+                  <p className="text-xl font-extrabold text-slate-800">Flujo de Caja Real</p>
                 </div>
-                <p className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight truncate">-{formatCurrency(metrics.fixedExp)}</p>
+                <div className="h-[320px] w-full cursor-pointer ml-[-10px] md:ml-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={dailyEvolutionData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} onClick={handleBarClick}>
+                        <defs>
+                          <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} dy={12} minTickGap={30} />
+                        <YAxis axisLine={false} tickLine={false} width={50} tick={{ fill: '#cbd5e1', fontSize: 11, fontWeight: 700 }} tickFormatter={(val) => val >= 1000 ? `${(val/1000).toFixed(0)}k` : val} />
+                        <RechartsTooltip 
+                          cursor={{ stroke: 'rgba(59, 130, 246, 0.2)', strokeWidth: 2, strokeDasharray: '4 4' }} 
+                          contentStyle={{ borderRadius: '1.2rem', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', transition: 'all 250ms cubic-bezier(0.2, 0, 0, 1)' }}
+                          formatter={(value: any, _name: any) => [formatCurrency(Number(value)), 'Neto']}
+                          labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="Balance" 
+                          stroke="#3b82f6" 
+                          strokeWidth={4} 
+                          fillOpacity={1} 
+                          fill="url(#colorBalance)" 
+                          isAnimationActive={true}
+                          animationBegin={100}
+                          animationDuration={1500}
+                          animationEasing="ease-out"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                </div>
               </motion.div>
 
-              <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
-                <div className="flex justify-between items-start mb-3">
-                  <p className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">G. Variables</p>
-                  <div className="p-2 bg-amber-50 text-amber-600 rounded-xl group-hover:scale-110 transition-transform"><Activity size={18} strokeWidth={2.5}/></div>
+              {/* Responsabilidades Próximas - Formato Tabla Lista */}
+              <motion.div variants={itemVariants} className="bg-white p-6 md:p-8 rounded-[32px] shadow-premium w-full">
+                <div className="flex justify-between items-center mb-6 pl-2">
+                   <div>
+                     <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Tus Objetivos</h3>
+                     <h2 className="text-xl font-extrabold text-slate-800">Top Performers</h2>
+                   </div>
                 </div>
-                <p className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight truncate">-{formatCurrency(metrics.varExp)}</p>
-              </motion.div>
 
-              <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
-                <div className="flex justify-between items-start mb-3">
-                  <p className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">G. Innec.</p>
-                  <div className="p-2 bg-rose-50 text-rose-600 rounded-xl group-hover:scale-110 transition-transform"><TrendingDown size={18} strokeWidth={2.5}/></div>
-                </div>
-                <p className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight truncate">-{formatCurrency(metrics.unnecExp)}</p>
-              </motion.div>
-
-              <motion.div variants={itemVariants} className="bg-white p-5 rounded-3xl shadow-[0_4px_30px_rgb(0,0,0,0.03)] border border-slate-100 flex flex-col justify-between group hover:shadow-[0_8px_40px_rgb(0,0,0,0.06)] transition-all">
-                <div className="flex justify-between items-start mb-3">
-                  <p className="text-[11px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">Inversiones</p>
-                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl group-hover:scale-110 transition-transform"><Briefcase size={18} strokeWidth={2.5}/></div>
-                </div>
-                <p className="text-xl sm:text-2xl font-extrabold text-slate-800 tracking-tight truncate">-{formatCurrency(metrics.investmentsTotal)}</p>
-              </motion.div>
-
-              <motion.div variants={itemVariants} className={`p-5 rounded-3xl flex flex-col justify-between shadow-xl border ${
-                  metrics.balance < 0 
-                  ? 'bg-gradient-to-br from-rose-500 to-rose-700 border-rose-600 shadow-rose-900/20' 
-                  : 'bg-gradient-to-br from-slate-800 to-slate-950 border-slate-700 shadow-slate-900/20'
-               }`}>
-                <div className="flex justify-between items-start mb-3">
-                  <p className="text-[11px] sm:text-xs font-black text-slate-300 uppercase tracking-widest">Balance Neto</p>
-                  <div className="p-2 bg-white/10 text-white rounded-xl backdrop-blur-md"><DollarSign size={18} strokeWidth={2.5}/></div>
-                </div>
-                <p className="text-xl sm:text-2xl font-extrabold text-white tracking-tight truncate">{formatCurrency(metrics.balance)}</p>
+                {obsLoading ? (
+                   <div className="flex justify-center items-center h-24">
+                     <div className="w-8 h-8 border-4 border-slate-100 border-t-blue-500 rounded-full animate-spin" />
+                   </div>
+                ) : topUrgentObs.length === 0 ? (
+                   <div className="border border-dashed border-slate-200 rounded-[24px] p-8 text-center flex flex-col items-center">
+                      <p className="text-slate-400 font-bold mb-4">Mesa limpia. No hay metas pendientes.</p>
+                      <button onClick={() => navigate('/obligations')} className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-600 px-5 py-2.5 rounded-xl font-bold transition-all shadow-sm">
+                         + Crear nueva meta
+                      </button>
+                   </div>
+                ) : (
+                   <div className="flex flex-col gap-3">
+                      {topUrgentObs.map(ob => {
+                         const isUrgent = ob.daysRemaining <= 5;
+                         return (
+                            <div 
+                               key={ob.id} 
+                               onClick={() => navigate('/obligations')}
+                               className={`flex items-center justify-between p-4 bg-slate-50 rounded-[20px] cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md border ${
+                                  isUrgent ? 'border-orange-100 hover:border-orange-200' : 'border-transparent hover:border-slate-200'
+                               }`}
+                            >
+                               <div className="flex items-center gap-4 flex-1 overflow-hidden">
+                                 <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center shrink-0 ${isUrgent ? 'bg-orange-100 text-orange-600' : 'bg-white text-slate-400 shadow-sm'}`}>
+                                    <Target size={20} strokeWidth={2.5}/>
+                                 </div>
+                                 <div className="flex flex-col">
+                                    <h4 className="font-extrabold text-slate-800 text-[15px] line-clamp-1">{ob.titulo}</h4>
+                                    <div className="flex items-center gap-2 mt-1">
+                                       <span className={`text-[10px] font-black uppercase tracking-widest ${isUrgent ? 'text-orange-500' : 'text-slate-400'}`}>
+                                          {ob.daysRemaining === 0 ? 'Vence hoy' : `Faltan ${ob.daysRemaining}d`}
+                                       </span>
+                                    </div>
+                                 </div>
+                               </div>
+                               
+                               <div className="w-[120px] flex flex-col items-end shrink-0">
+                                  <span className={`text-[12px] font-black ${ob.isGoodTrend ? 'text-emerald-500' : 'text-blue-500'} mb-1.5`}>{ob.progress.toFixed(0)}%</span>
+                                  <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden relative">
+                                     <motion.div 
+                                        className={`h-full absolute left-0 top-0 rounded-full ${ob.isGoodTrend ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${ob.progress}%` }}
+                                        transition={{ duration: 1.5, ease: "easeOut", delay: 0.2 }}
+                                     />
+                                  </div>
+                               </div>
+                            </div>
+                         );
+                      })}
+                   </div>
+                )}
               </motion.div>
             </div>
 
-            {/* Evolución Diaria (ComposedChart 100% width) */}
-            <motion.div variants={itemVariants} className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 w-full mb-6">
-              <div className="mb-8">
-                <h3 className="text-xs sm:text-sm font-extrabold text-slate-500 uppercase tracking-widest">Evolución Diaria</h3>
-                <p className="text-xs sm:text-sm font-semibold text-slate-400 mt-1">Comparativa de ingresos y tendencia de balance. Toca una barra para ver los movimientos de ese día.</p>
-              </div>
-              <div className="h-[320px] w-full cursor-pointer ml-[-10px] md:ml-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={dailyEvolutionData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }} onClick={handleBarClick}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }} dy={12} minTickGap={30} />
-                      <YAxis yAxisId="left" axisLine={false} tickLine={false} width={50} tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 600 }} tickFormatter={(val) => val >= 1000 ? `${(val/1000).toFixed(0)}k` : val} />
-                      <YAxis yAxisId="right" orientation="right" hide />
-                      <RechartsTooltip 
-                        cursor={{ fill: 'rgba(59, 130, 246, 0.04)' }} 
-                        contentStyle={{ borderRadius: '1.2rem', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.08)' }}
-                        formatter={(value: any, name: any) => [formatCurrency(Number(value)), name === 'Ingresos' ? 'Ingresos' : 'Balance Neto']}
-                        labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}
-                      />
-                      <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#64748b', paddingBottom: '20px' }} />
-                      <Bar yAxisId="left" dataKey="Ingresos" fill="#3b82f6" fillOpacity={0.8} radius={[6, 6, 0, 0]} maxBarSize={40} />
-                      <Line yAxisId="right" type="monotone" dataKey="Balance" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-              </div>
-            </motion.div>
+            {/* LADO DERECHO: CONTEXTO GENERAL & BALANCE */}
+            <div className="flex flex-col gap-6">
+              <motion.div 
+                variants={itemVariants} 
+                whileHover={{ y: -4, scale: 1.01, boxShadow: 'var(--shadow-premium-hover)' }} 
+                className="bg-white p-8 rounded-[32px] shadow-premium border border-slate-50 sticky top-8 transition-material group"
+              >
+                 <div className="flex justify-between items-start mb-6">
+                    <div>
+                       <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Tu Dinero</h3>
+                       <p className="text-[15px] font-bold text-slate-600">Balance Neto Actual</p>
+                    </div>
+                    <div className="p-3 bg-blue-50 text-blue-500 rounded-[16px]"><DollarSign size={20} strokeWidth={3}/></div>
+                 </div>
+                 <span className={`text-4xl font-black tracking-tighter ${metrics.balance < 0 ? 'text-rose-500' : 'text-slate-800'}`}>
+                    {formatCurrency(metrics.balance)}
+                 </span>
+                 
+                 <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-slate-100">
+                    <div>
+                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Ingresos Mes</span>
+                       <span className="text-[15px] font-extrabold text-emerald-500">{formatCurrency(metrics.income)}</span>
+                    </div>
+                    <div>
+                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Gastos Mes</span>
+                       <span className="text-[15px] font-extrabold text-slate-600">-{formatCurrency(metrics.fixedExp + metrics.varExp + metrics.unnecExp)}</span>
+                    </div>
+                 </div>
+              </motion.div>
+            </div> {/* End Right Sidebar */}
+            {/* Fin 3-Column Layout */}
 
+          <div className="lg:col-span-3 mt-6 w-full">
             {/* Charts Module Baseline */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Bar Chart: Mejores Dias */}
-              <motion.div variants={itemVariants} className="bg-white p-6 md:p-8 pt-8 pb-10 rounded-[2.5rem] shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 lg:col-span-2">
+              <motion.div 
+                variants={itemVariants} 
+                whileHover={{ y: -4, scale: 1.01, boxShadow: 'var(--shadow-premium-hover)' }} 
+                className="bg-white p-6 md:p-8 pt-8 pb-10 rounded-[2.5rem] shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 lg:col-span-2 transition-material group"
+              >
                 <div className="mb-10">
                   <h3 className="text-xs sm:text-sm font-extrabold text-slate-500 uppercase tracking-widest">Análisis de Mejores Días</h3>
                   <p className="text-xs sm:text-sm font-semibold text-slate-400 mt-1">Distribución histórica de Ingresos según el día de la semana</p>
@@ -451,7 +757,17 @@ export const DashboardView = () => {
                           formatter={(value: any) => formatCurrency(Number(value))}
                           labelStyle={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}
                         />
-                        <Bar dataKey="Income" name="Ingresos" radius={[12, 12, 0, 0]} maxBarSize={50}>
+                        <Bar 
+                          dataKey="Income" 
+                          name="Ingresos"
+                          fill="#3b82f6" 
+                          radius={[6, 6, 6, 6]} 
+                          barSize={32}
+                          isAnimationActive={true}
+                          animationBegin={200}
+                          animationDuration={1200}
+                          animationEasing="ease-out"
+                        >
                            {weekdaysChart.map((entry, index) => {
                               const maxIncome = Math.max(...weekdaysChart.map(d => d.Income));
                               const opacity = entry.Income === maxIncome && entry.Income > 0 ? 1 : 0.6;
@@ -463,8 +779,12 @@ export const DashboardView = () => {
                 </div>
               </motion.div>
 
-              {/* Pie Chart: Top Categorías */}
-              <motion.div variants={itemVariants} className="bg-white p-6 md:p-8 pt-8 pb-10 rounded-[2.5rem] shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col">
+              {/* PIE CHART: CATEGORIAS */}
+              <motion.div 
+                variants={itemVariants} 
+                whileHover={{ y: -4, scale: 1.01, boxShadow: 'var(--shadow-premium-hover)' }} 
+                className="bg-white p-6 md:p-8 pt-8 pb-10 rounded-[2.5rem] shadow-[0_4px_30px_rgb(0,0,0,0.02)] border border-slate-100 flex flex-col justify-center items-center transition-material group"
+              >
                 <div className="mb-6">
                   <h3 className="text-xs sm:text-sm font-extrabold text-slate-500 uppercase tracking-widest">Top Categorías</h3>
                   <p className="text-xs sm:text-sm font-semibold text-slate-400 mt-1">Fuentes de mayores ingresos</p>
@@ -473,17 +793,20 @@ export const DashboardView = () => {
                   {pieData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart margin={{ top: 20, right: 0, bottom: 0, left: 0 }}>
-                        <Pie
-                          data={pieData}
-                          cx="50%" 
-                          cy="50%"
-                          innerRadius={isDesktop ? 70 : 65} 
-                          outerRadius={isDesktop ? 90 : 85}
-                          paddingAngle={6}
-                          dataKey="value"
-                          stroke="none"
-                          cornerRadius={6}
-                        >
+                          <Pie
+                             data={pieData}
+                             cx="50%"
+                             cy="50%"
+                             innerRadius={65}
+                             outerRadius={85}
+                             paddingAngle={8}
+                             dataKey="value"
+                             stroke="none"
+                             isAnimationActive={true}
+                             animationBegin={400}
+                             animationDuration={1000}
+                             animationEasing="ease-out"
+                          >                   
                           {pieData.map((_entry, index) => (
                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
@@ -627,6 +950,7 @@ export const DashboardView = () => {
                 )}
               </motion.div>
             )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

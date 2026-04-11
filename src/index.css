@@ -8,6 +8,16 @@
   --color-primary-700: #1d4ed8;
 
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Poppins', 'Inter', system-ui, sans-serif;
+  --shadow-premium: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
+  --shadow-premium-hover: 0 15px 40px -5px rgba(0, 0, 0, 0.08);
+}
+
+:root {
+  --ease-material: cubic-bezier(0.2, 0, 0, 1);
+  --duration-micro: 150ms;
+  --duration-base: 250ms;
+  --duration-macro: 300ms;
 }
 
 body {
@@ -15,4 +25,60 @@ body {
   color: #0f172a;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Utilitarios globales para el Manifesto 3.0 */
+.custom-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.custom-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Glassmorphism o utilitarios extra si se necesitan */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Base Transition Class for Global Material Animation */
+.transition-material {
+  transition-timing-function: var(--ease-material);
+  transition-duration: var(--duration-base);
+}
+
+@keyframes soft-pulse-glow {
+  0% {
+    transform: scale(1);
+    opacity: 0.1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.1;
+  }
+}
+
+.animate-soft-pulse-glow {
+  animation: soft-pulse-glow 3s var(--ease-material) infinite;
+}
+
+@keyframes ripple {
+  from {
+    opacity: 1;
+    transform: scale(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(4);
+  }
+}
+
+.animate-ripple {
+  animation: ripple 600ms var(--ease-material) forwards;
 }

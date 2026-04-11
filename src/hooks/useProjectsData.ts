@@ -23,6 +23,7 @@ export interface Project {
    tasks: AppTask[];
    progress: number;
    daysRemaining: number;
+   estado?: 'todo' | 'progress' | 'done';
 }
 
 export const useProjectsData = () => {

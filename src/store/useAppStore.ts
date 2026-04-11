@@ -19,6 +19,12 @@ interface AppState {
   setIsLoading: (isLoading: boolean) => void;
   isPomodoroRunning: boolean;
   setIsPomodoroRunning: (isRunning: boolean) => void;
+  workspaceActiveTab: 'list' | 'kanban' | 'notes' | 'calendar';
+  setWorkspaceActiveTab: (tab: 'list' | 'kanban' | 'notes' | 'calendar') => void;
+  selectedNoteId: string | null;
+  setSelectedNoteId: (id: string | null) => void;
+  isFocusModeActive: boolean;
+  setIsFocusModeActive: (active: boolean) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -32,4 +38,10 @@ export const useAppStore = create<AppState>((set) => ({
   setIsLoading: (isLoading) => set({ isLoading }),
   isPomodoroRunning: false,
   setIsPomodoroRunning: (isPomodoroRunning) => set({ isPomodoroRunning }),
+  workspaceActiveTab: 'list',
+  setWorkspaceActiveTab: (tab) => set({ workspaceActiveTab: tab }),
+  selectedNoteId: null,
+  setSelectedNoteId: (id) => set({ selectedNoteId: id }),
+  isFocusModeActive: false,
+  setIsFocusModeActive: (active) => set({ isFocusModeActive: active }),
 }));

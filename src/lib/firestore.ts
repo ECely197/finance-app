@@ -233,3 +233,44 @@ export const createNote = async (userId: string, profileId: string, data: any) =
   const notesRef = collection(db, `users/${userId}/profiles/${profileId}/notes`);
   await addDoc(notesRef, data);
 };
+
+export const updateNote = async (userId: string, profileId: string, noteId: string, data: any) => {
+  const noteRef = doc(db, `users/${userId}/profiles/${profileId}/notes/${noteId}`);
+  await updateDoc(noteRef, data);
+};
+
+export const deleteNote = async (userId: string, profileId: string, noteId: string) => {
+  const noteRef = doc(db, `users/${userId}/profiles/${profileId}/notes/${noteId}`);
+  await deleteDoc(noteRef);
+};
+
+export const createRecurringExpense = async (userId: string, profileId: string, data: any) => {
+  const ref = collection(db, `users/${userId}/profiles/${profileId}/recurring_expenses`);
+  await addDoc(ref, data);
+};
+
+export const updateRecurringExpense = async (userId: string, profileId: string, expenseId: string, data: any) => {
+  const ref = doc(db, `users/${userId}/profiles/${profileId}/recurring_expenses/${expenseId}`);
+  await updateDoc(ref, data);
+};
+
+export const deleteRecurringExpense = async (userId: string, profileId: string, expenseId: string) => {
+  const ref = doc(db, `users/${userId}/profiles/${profileId}/recurring_expenses/${expenseId}`);
+  await deleteDoc(ref);
+};
+
+// Separados
+export const createSeparado = async (userId: string, profileId: string, data: any) => {
+  const ref = collection(db, `users/${userId}/profiles/${profileId}/separados`);
+  await addDoc(ref, data);
+};
+
+export const updateSeparado = async (userId: string, profileId: string, separadoId: string, data: any) => {
+  const ref = doc(db, `users/${userId}/profiles/${profileId}/separados/${separadoId}`);
+  await updateDoc(ref, data);
+};
+
+export const deleteSeparado = async (userId: string, profileId: string, separadoId: string) => {
+  const ref = doc(db, `users/${userId}/profiles/${profileId}/separados/${separadoId}`);
+  await deleteDoc(ref);
+};

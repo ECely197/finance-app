@@ -1,24 +1,24 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Plus, TrendingUp, Settings, LogOut, ScrollText, Target, X, CheckSquare, Moon } from 'lucide-react';
+import { LayoutDashboard, Plus, Home, TrendingUp, Settings, LogOut, ScrollText, Target, X, CheckSquare, Moon, CalendarClock, Brain, PieChart } from 'lucide-react';
 import { ProfileSelector } from './ProfileSelector';
 import { TransactionForm } from '../transactions/TransactionForm';
 import { GlobalTaskTicker } from './GlobalTaskTicker';
 import { GlobalCommandPalette } from './GlobalCommandPalette';
-import { FocusTimer } from './FocusTimer';
+
 import { DailyClosingModal } from '../dashboard/DailyClosingModal';
 import { TransactionsView } from '../transactions/TransactionsView';
-import { ProjectsView } from '../projects/ProjectsView';
 import { auth } from '../../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useAppStore } from '../../store/useAppStore';
+import { Ripple } from '../ui/Ripple';
 
 export const MainLayout = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showClosingModal, setShowClosingModal] = useState(false);
-  const [showProjectsModal, setShowProjectsModal] = useState(false);
   const [showTransactionsModal, setShowTransactionsModal] = useState(false);
 
   const { isPomodoroRunning } = useAppStore();
@@ -29,15 +29,16 @@ export const MainLayout = () => {
     { name: 'Proyectos', path: '/projects', icon: CheckSquare },
     { name: 'Metas', path: '/obligations', icon: Target },
     { name: 'Inversiones', path: '/investments', icon: TrendingUp },
+    { name: 'Gastos Fijos', path: '/recurring', icon: CalendarClock },
     { name: 'Ajustes', path: '/settings', icon: Settings },
   ];
 
   const mobileNavItems = [
-    { name: 'Inicio', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Historial', path: '/transactions', icon: ScrollText },
-    { name: 'FAB', isFab: true },
-    { name: 'Metas', path: '/obligations', icon: Target },
-    { name: 'Ajustes', path: '/settings', icon: Settings },
+    { name: 'Inicio',       path: '/dashboard',    icon: LayoutDashboard },
+    { name: 'Historial',   path: '/transactions',  icon: ScrollText },
+    { name: 'Metas',       path: '/obligations',   icon: Target },
+    { name: 'Reportes',    path: '/recurring',     icon: PieChart },
+    { name: 'Ajustes',     path: '/settings',      icon: Settings },
   ];
 
   const handleLogout = () => {
@@ -72,26 +73,26 @@ export const MainLayout = () => {
       <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row text-slate-800 overflow-x-hidden pt-1">
       
       {/* Sidebar Desktop */}
-      <aside className="hidden md:flex flex-col w-72 bg-white border-r border-slate-100 p-6 fixed h-full z-10 shadow-[2px_0_20px_rgb(0,0,0,0.02)]">
-        <div className="mb-10 flex items-center gap-3 px-2">
-          <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold text-xl shadow-md shadow-blue-500/20">
-            F
+      <aside className="hidden md:flex flex-col w-72 bg-[#F8FAFC] p-8 fixed h-full z-10">
+        <div className="mb-12 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-[24px] bg-blue-500 text-white flex items-center justify-center font-black text-2xl shadow-premium">
+            S
           </div>
-          <span className="text-xl font-bold tracking-tight text-slate-800">FinanceApp</span>
+          <span className="text-2xl font-black tracking-tight text-slate-800">SofiLu.</span>
         </div>
-        <div className="mb-8 px-2">
+        <div className="mb-10">
            <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setIsModalOpen(true)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-3 py-3.5 rounded-full font-bold shadow-md shadow-blue-500/20 transition-all outline-none"
+              className="w-full bg-white border border-slate-100 hover:border-blue-500 text-slate-800 flex items-center justify-center gap-3 py-4 rounded-[24px] font-bold shadow-premium transition-all outline-none group relative overflow-hidden"
            >
-              <Plus size={20} strokeWidth={2.5}/>
+              <Ripple />
+              <div className="bg-blue-50 text-blue-500 p-1.5 rounded-full group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                 <Plus size={18} strokeWidth={3}/>
+              </div>
               Nueva Transacción
            </motion.button>
-           <div className="flex justify-center mt-2.5">
-             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 shadow-sm shrink-0">Presiona 'N'</span>
-           </div>
         </div>
 
         <nav className="flex-1 space-y-2">
@@ -101,16 +102,17 @@ export const MainLayout = () => {
                 key={item.name}
                 to={item.path!}
                 className={({ isActive }) => 
-                  `flex items-center gap-4 px-4 py-3.5 rounded-2xl font-medium transition-all duration-200 outline-none ${
+                  `flex items-center gap-4 px-5 py-4 rounded-[24px] font-bold transition-all duration-300 outline-none relative overflow-hidden ${
                     isActive 
-                    ? 'bg-blue-50 text-blue-700' 
-                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+                    ? 'bg-white shadow-premium text-blue-600' 
+                    : 'text-slate-400 hover:text-slate-800 hover:bg-white/50'
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <item.icon size={22} className={isActive ? 'text-blue-600' : ''} />
+                    <Ripple />
+                    <item.icon size={22} className={isActive ? 'text-blue-500' : 'opacity-70'} strokeWidth={isActive ? 2.5 : 2} />
                     {item.name}
                   </>
                 )}
@@ -119,31 +121,33 @@ export const MainLayout = () => {
           })}
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-slate-100">
+        <div className="mt-auto pt-6 border-t border-slate-100/50">
           <button 
             onClick={() => setShowClosingModal(true)}
-            className="flex items-center gap-4 px-4 py-3.5 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all w-full font-medium mb-1"
+            className="flex items-center gap-4 px-5 py-4 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-[24px] transition-all w-full font-bold mb-2 group relative overflow-hidden"
           >
-            <Moon size={22} />
+            <Ripple />
+            <Moon size={22} className="opacity-70 group-hover:text-indigo-500" strokeWidth={2}/>
             Cierre de Día
           </button>
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-4 px-4 py-3.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all w-full font-medium"
+            className="flex items-center gap-4 px-5 py-4 text-slate-400 hover:text-rose-600 hover:bg-white rounded-[24px] transition-all w-full font-bold group relative overflow-hidden"
           >
-            <LogOut size={22} />
+            <Ripple />
+            <LogOut size={22} className="opacity-70 group-hover:text-rose-500" strokeWidth={2}/>
             Cerrar sesión
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 md:ml-72 mb-20 md:mb-0 w-full min-h-screen flex flex-col">
+      <main className="flex-1 md:ml-72 mb-24 md:mb-0 w-full min-h-screen flex flex-col bg-[#F8FAFC]">
         {/* Top Header */}
-        <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-[0_4px_30px_rgb(0,0,0,0.02)]">
+        <header className="sticky top-0 z-20 bg-[#F8FAFC]/80 backdrop-blur-xl px-6 md:px-10 py-6 flex items-center justify-between">
           <div className="md:hidden flex items-center gap-3">
-             <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-sm shadow-blue-500/20">F</div>
-             <span className="font-bold tracking-tight text-slate-800">FinanceApp</span>
+             <div className="w-10 h-10 rounded-[20px] bg-blue-500 text-white flex items-center justify-center font-black shadow-premium">S</div>
+             <span className="font-black tracking-tight text-slate-800 text-xl">SofiLu.</span>
           </div>
 
           {/* Quick Capture Hint */}
@@ -176,63 +180,158 @@ export const MainLayout = () => {
         </div>
       </main>
 
-      {/* Bottom Nav Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-100 pt-2 pb-5 z-40 shadow-[0_-10px_40px_rgb(0,0,0,0.04)] px-4">
-         <div className="flex items-center justify-between relative max-w-md mx-auto">
-            {mobileNavItems.map((item, idx) => {
-               if (item.isFab) {
-                  return (
-                     <div key={`fab-${idx}`} className="relative -top-6 flex justify-center">
-                        <motion.button 
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => setIsModalOpen(true)}
-                          className="w-14 h-14 bg-gradient-to-tr from-blue-600 to-blue-500 rounded-[1.2rem] text-white flex items-center justify-center shadow-[0_10px_30px_rgba(37,99,235,0.4)] rotate-45 hover:rotate-90 transition-transform duration-300 z-50 outline-none"
-                        >
-                           <div className="-rotate-45 hover:-rotate-90 transition-transform duration-300">
-                             <Plus size={30} strokeWidth={2.5}/>
-                           </div>
-                        </motion.button>
-                     </div>
-                  );
-               }
-               
-               return (
-                 <NavLink
-                   key={item.name}
-                   to={item.path!}
-                   className={({ isActive }) => 
-                     `flex flex-col items-center gap-1 p-2 w-14 sm:w-16 transition-colors relative outline-none ${
-                       isActive ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'
-                     }`
-                   }
-                 >
-                   <div className="p-1">
-                     {/* @ts-ignore */}
-                     <item.icon size={22} strokeWidth={2.5} />
-                   </div>
-                   <span className="text-[10px] font-bold tracking-tight mt-0.5 truncate w-full text-center">{item.name}</span>
-                 </NavLink>
-               );
-            })}
-         </div>
+      {/*
+        ════════════════════════════════════════════════════════
+          MOBILE NAV — Organic Notch (Circle-Fitted)
+        ════════════════════════════════════════════════════════
+
+        SVG viewBox 0 0 100 68 + preserveAspectRatio=none
+        → responsive at any screen width.
+
+        Plus button:
+          position: bottom 10px, right 16px
+          center: x = screen - 44px (≈88.7% on 390px) , y = 38px from bottom
+          center in SVG space: x=88.5, y = 68-38 = 30
+          radius in SVG: 28px height / 68 = 0.41 normalized → fits at y=30±28
+
+        SVG path wraps the notch around Plus's circumference + 6px clearance.
+        The circle (r=28, center y=30) bottom at y=58. With clearance: y=64.
+        The notch dips to y=65 at x=88.5 — hugging the bottom of Plus.
+
+        Brain button:
+          Floats ABOVE-LEFT of Plus in a clean diagonal.
+          z-[100] (highest) ensures Brain is always touchable.
+
+        Both SVG bar (z-40) and nav icons (z-50) are BELOW both FABs.
+      */}
+
+      {/* ── SVG Bar (circle-fitted notch, scales with screen) ── */}
+      <div
+        className="md:hidden fixed bottom-0 left-0 w-full z-[40] pointer-events-none"
+        style={{ height: '68px' }}
+      >
+        <svg
+          width="100%" height="100%"
+          viewBox="0 0 100 68"
+          preserveAspectRatio="none"
+          style={{ display: 'block' }}
+        >
+          <defs>
+            <filter id="navCircleFit" x="-5%" y="-120%" width="115%" height="350%">
+              <feDropShadow dx="0" dy="-3" stdDeviation="7" floodColor="rgba(0,0,0,0.07)" />
+            </filter>
+          </defs>
+          {/*
+            Path breakdown (notch centered at x=88.5, depth=65):
+            ─ 0→68: flat top edge (the main bar)
+            ─ 68→82: smooth organic entry L curve downward
+            ─ 82→88.5: sweeping arc to the bottom of the notch (y=65)
+            ─ 88.5→95: symmetric arc exiting the notch bottom
+            ─ 95→100: smooth organic exit back to bar level
+            The tangent at x=68 is horizontal (y stays at 0 from cp1).
+            The tangent at x=100 is near-vertical (exits to top right).
+          */}
+          <path
+            d="M 0,68 L 0,0 L 68,0
+               C 72,0 76,18 82,44
+               C 85,58 87,64 88.5,65
+               C 90,64 92,58 95,44
+               C 98,22 99.5,4 100,0
+               L 100,68 Z"
+            fill="white"
+            filter="url(#navCircleFit)"
+          />
+        </svg>
+      </div>
+
+      {/* ── Nav Icons (5 items, left 77%, well inside flat bar zone) ── */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 z-[50] pointer-events-auto"
+        style={{ height: '68px', width: '77%' }}
+      >
+        <div className="h-full flex items-center justify-around px-1">
+          {mobileNavItems.map((item) => (
+            <NavLink
+              key={item.name}
+              to={item.path!}
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-2xl transition-all duration-200 relative outline-none ${
+                  isActive ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Ripple />
+                  <item.icon size={24} strokeWidth={isActive ? 2.5 : 1.8} />
+                  <div
+                    className={`h-[3px] rounded-full bg-blue-500 transition-all duration-200 ${
+                      isActive ? 'w-5 opacity-100' : 'w-0 opacity-0'
+                    }`}
+                  />
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
       </nav>
 
-      {/* Action Stack (Floating Buttons in bottom-right) */}
-      <div className="fixed bottom-24 right-4 md:bottom-8 md:right-8 z-[90] flex flex-col items-end gap-3 pointer-events-none">
-          {/* Projects Button */}
-          <button 
-            onClick={() => setShowProjectsModal(true)}
-            className="w-12 h-12 rounded-2xl flex items-center justify-center bg-white border border-slate-100 text-blue-600 shadow-lg transition-all active:scale-95 pointer-events-auto hover:bg-slate-50"
-            title="Proyectos y Tareas"
-          >
-             <CheckSquare size={22} strokeWidth={2.5} />
-          </button>
+      {/*
+        FABs — both independent fixed elements, z above SVG bar.
+        Plus (z-95): CENTERED in the notch scoop.
+        Brain (z-100): Diagonal ABOVE-LEFT of Plus, highest z = always touchable.
+      */}
 
-          {/* Pomodoro Timer (Managed container inside stack) */}
-          <div className="pointer-events-auto">
-             <FocusTimer />
-          </div>
-      </div>
+      {/* Plus FAB:
+           /productividad → Home (volver a Finanzas)
+           otras rutas    → abrir modal de transacción      */}
+      <motion.button
+        className={`md:hidden fixed z-[95] w-14 h-14 rounded-full flex items-center justify-center text-white overflow-hidden ${
+          location.pathname === '/productividad' ? 'bg-slate-700' : 'bg-blue-500'
+        }`}
+        style={{
+          bottom: '10px',
+          right:  '16px',
+          boxShadow: location.pathname === '/productividad'
+            ? '0 8px 28px -4px rgba(30,41,59,0.45)'
+            : '0 8px 28px -4px rgba(59,130,246,0.55)',
+        }}
+        onClick={() =>
+          location.pathname === '/productividad'
+            ? navigate('/dashboard')
+            : setIsModalOpen(true)
+        }
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.92 }}
+        title={location.pathname === '/productividad' ? 'Volver a Finanzas' : 'Nuevo Registro'}
+      >
+        <Ripple />
+        {location.pathname === '/productividad'
+          ? <Home size={24} strokeWidth={2.5} />
+          : <Plus size={26} strokeWidth={3} />}
+      </motion.button>
+
+      {/* Brain FAB:
+           /productividad → oculto (ya estás ahí)
+           otras rutas    → navegar a /productividad           */}
+      {location.pathname !== '/productividad' && (
+        <motion.button
+          className="md:hidden fixed z-[100] w-12 h-12 rounded-full flex items-center justify-center bg-white text-blue-500 overflow-hidden"
+          style={{
+            bottom: '66px',
+            right:  '54px',
+            boxShadow: '0 6px 22px -4px rgba(0,0,0,0.12)',
+            border: '1.5px solid #e2e8f0',
+          }}
+          onClick={() => navigate('/productividad')}
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.92 }}
+          title="Segundo Cerebro"
+        >
+          <Ripple />
+          <Brain size={22} strokeWidth={2.2} />
+        </motion.button>
+      )}
 
       {/* FocusLock Overlay */}
       <AnimatePresence>
@@ -267,38 +366,6 @@ export const MainLayout = () => {
           )}
       </AnimatePresence>
 
-      <AnimatePresence>
-          {showProjectsModal && (
-             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                <motion.div 
-                  initial={{ opacity: 0 }} 
-                  animate={{ opacity: 1 }} 
-                  exit={{ opacity: 0 }} 
-                  onClick={() => setShowProjectsModal(false)} 
-                  className="absolute inset-0 bg-black/50 backdrop-blur-sm" 
-                />
-                
-                <motion.div 
-                  initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-                  animate={{ scale: 1, opacity: 1, y: 0 }} 
-                  exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                  className="bg-white relative w-full max-w-lg max-h-[85vh] rounded-[2.5rem] shadow-2xl z-10 overflow-hidden flex flex-col p-6"
-                >
-                   <div className="flex justify-between items-center mb-6 shrink-0">
-                      <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center"><CheckSquare size={20} /></div>
-                         <h2 className="text-xl font-black text-slate-800 tracking-tight">Proyectos y Hábitos</h2>
-                      </div>
-                      <button onClick={() => setShowProjectsModal(false)} className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors outline-none"><X size={20} /></button>
-                   </div>
-                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-1">
-                      <ProjectsView hideHeader={true} />
-                   </div>
-                </motion.div>
-             </div>
-          )}
-      </AnimatePresence>
-
       {/* Global Transaction Modal (BottomSheet on Mobile, Centered on PC) */}
       <AnimatePresence>
          {isModalOpen && !isPomodoroRunning && (
@@ -321,10 +388,16 @@ export const MainLayout = () => {
                     <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
                  </div>
 
-                 {/* Close button for desktop */}
-                 <button onClick={() => setIsModalOpen(false)} className="hidden md:flex absolute top-6 right-6 p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors z-20 outline-none">
-                    <X size={20} />
-                 </button>
+                 {/* Modal Header Minimalist */}
+                 <div className="px-8 pt-8 pb-4 flex justify-between items-center bg-gradient-to-b from-blue-50/30 to-white md:rounded-t-[2.5rem] rounded-t-[2.5rem] border-b border-blue-50">
+                    <div>
+                       <h2 className="text-xl font-black text-slate-800 tracking-tight">Registro de Movimiento</h2>
+                       <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mt-1">SofiLu Intelligent Vault</p>
+                    </div>
+                    <button onClick={() => setIsModalOpen(false)} className="p-2.5 bg-white border border-slate-100 hover:border-blue-200 text-slate-400 hover:text-blue-500 rounded-full transition-all shadow-sm outline-none">
+                       <X size={20} />
+                    </button>
+                 </div>
                  
                  {/* Modal flow content */}
                  <div className="flex-1 flex flex-col min-h-0">

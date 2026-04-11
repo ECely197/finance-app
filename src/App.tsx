@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './lib/firebase';
 import { getProfiles } from './lib/firestore';
@@ -13,10 +13,65 @@ import { SettingsView } from './components/settings/SettingsView';
 import { InvestmentsView } from './components/investments/InvestmentsView';
 import { TransactionsView } from './components/transactions/TransactionsView';
 import { ObligationsView } from './components/obligations/ObligationsView';
-import { ProjectsView } from './components/projects/ProjectsView';
+
+import { RecurringExpensesView } from './components/recurring/RecurringExpensesView';
+import { ProductivityWorkspace } from './components/productivity/ProductivityWorkspace';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const AnimatedRoutes = () => {
+  const { user, isLoading, profiles } = useAppStore();
+  const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+         <div className="w-16 h-16 rounded-3xl bg-blue-100 flex items-center justify-center animate-pulse shadow-inner">
+            <span className="text-blue-600 font-bold text-2xl">F</span>
+         </div>
+      </div>
+    );
+  }
+
+  // Si no hay perfiles creados, forzar Onboarding
+  if (user && !isLoading && profiles.length === 0) {
+    return <OnboardingProfile />;
+  }
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        {user ? (
+          <>
+            <Route path="/" element={
+               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="w-full min-h-screen">
+                  <MainLayout />
+               </motion.div>
+            }>
+               <Route index element={<Navigate to="/dashboard" replace />} />
+               <Route path="dashboard" element={<DashboardView />} />
+               <Route path="transactions" element={<TransactionsView />} />
+               <Route path="productividad" element={<ProductivityWorkspace />} />
+               <Route path="projects" element={<Navigate to="/productividad" replace />} />
+               <Route path="investments" element={<InvestmentsView />} />
+               <Route path="recurring" element={<RecurringExpensesView />} />
+               <Route path="obligations" element={<ObligationsView />} />
+               <Route path="settings" element={<SettingsView />} />
+               <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
+          </>
+        ) : (
+          <>
+            <Route path="/login" element={<AuthForm />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </>
+        )}
+      </Routes>
+    </AnimatePresence>
+  );
+};
 
 function App() {
-  const { user, setUser, profiles, setProfiles, setCurrentProfile, isLoading, setIsLoading } = useAppStore();
+  const { setUser, setProfiles, setCurrentProfile, setIsLoading } = useAppStore();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -44,42 +99,9 @@ function App() {
     return () => unsubscribe();
   }, [setUser, setProfiles, setCurrentProfile, setIsLoading]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-         <div className="w-16 h-16 rounded-3xl bg-blue-100 flex items-center justify-center animate-pulse shadow-inner">
-            <span className="text-blue-600 font-bold text-2xl">F</span>
-         </div>
-      </div>
-    );
-  }
-
-  // Si no hay perfiles creados, forzar Onboarding
-  if (user && !isLoading && profiles.length === 0) {
-    return <OnboardingProfile />;
-  }
-
   return (
     <Router>
-      <Routes>
-        {user ? (
-          <Route path="/" element={<MainLayout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardView />} />
-            <Route path="transactions" element={<TransactionsView />} />
-            <Route path="projects" element={<ProjectsView />} />
-            <Route path="investments" element={<InvestmentsView />} />
-            <Route path="obligations" element={<ObligationsView />} />
-            <Route path="settings" element={<SettingsView />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Route>
-        ) : (
-          <>
-            <Route path="/login" element={<AuthForm />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </>
-        )}
-      </Routes>
+       <AnimatedRoutes />
     </Router>
   );
 }

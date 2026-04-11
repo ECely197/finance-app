@@ -11,7 +11,7 @@ const MODES = {
     longBreak: { label: 'Descanso Largo', time: 15 * 60, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100', stroke: '#10b981' }
 };
 
-export const FocusTimer = () => {
+export const FocusTimer = ({ isDark = false }: { isDark?: boolean }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [mode, setMode] = useState<keyof typeof MODES>('work');
     const [timeLeft, setTimeLeft] = useState(MODES.work.time);
@@ -139,8 +139,11 @@ export const FocusTimer = () => {
                                         transition={{ duration: 0.5, ease: "linear" }}
                                     />
                                 </svg>
-                                <div className="z-10 flex flex-col items-center">
-                                    <span className={`text-4xl font-black tabular-nums tracking-tighter ${currentModeConf.color}`}>{formatTime(timeLeft)}</span>
+                                <div className="flex flex-col items-end">
+                                    <span className={`text-4xl font-black tabular-nums tracking-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                                        {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
+                                    </span>
+                                    <div className="flex items-center gap-1.5 mt-0.5"></div>
                                 </div>
                             </div>
 
