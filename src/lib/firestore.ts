@@ -15,6 +15,17 @@ export interface Transaction {
   categoryId: string;
   inversionIdRelacionada?: string; 
   description?: string;
+  createdAt?: Date;
+  // Campos de Pasarelas de Crédito y ERP
+  paymentMethod?: string; // 'contado' | 'addi' | 'sistecredito' | 'tarjeta' | 'apartado' | etc.
+  grossAmount?: number; // Monto bruto de venta
+  netAmount?: number; // Monto neto recibido
+  commissionRate?: number; // % comisión
+  commissionAmount?: number; // Descuento comisión ($)
+  disbursementDays?: number; // Días de desembolso
+  estimatedDisbursementDate?: Date; // Fecha estimada de desembolso
+  disbursementStatus?: 'desembolsado' | 'pendiente';
+  separadoId?: string;
 }
 
 export const createProfile = async (userId: string, profileId: string, profileData: Profile): Promise<void> => {
@@ -42,10 +53,17 @@ export const createTransaction = async (
   transactionData: Transaction
 ): Promise<void> => {
   const transactionRef = doc(db, `users/${userId}/profiles/${profileId}/transactions/${transactionId}`);
-  await setDoc(transactionRef, {
+  const payload: any = {
     ...transactionData,
-    date: Timestamp.fromDate(transactionData.date)
-  });
+    date: Timestamp.fromDate(transactionData.date),
+  };
+  if (transactionData.estimatedDisbursementDate) {
+    payload.estimatedDisbursementDate = Timestamp.fromDate(new Date(transactionData.estimatedDisbursementDate));
+  }
+  if (transactionData.createdAt) {
+    payload.createdAt = Timestamp.fromDate(new Date(transactionData.createdAt));
+  }
+  await setDoc(transactionRef, payload);
 };
 
 export const getTransactionsByDateRange = async (
@@ -262,17 +280,170 @@ export const deleteRecurringExpense = async (userId: string, profileId: string, 
 // Separados
 export const createSeparado = async (userId: string, profileId: string, data: any) => {
   const ref = collection(db, `users/${userId}/profiles/${profileId}/separados`);
-  await addDoc(ref, data);
+  const docRef = await addDoc(ref, {
+    ...data,
+    createdAt: data.createdAt ? (data.createdAt instanceof Date ? Timestamp.fromDate(data.createdAt) : data.createdAt) : Timestamp.fromDate(new Date()),
+    updatedAt: Timestamp.fromDate(new Date())
+  });
+  return docRef.id;
 };
 
 export const updateSeparado = async (userId: string, profileId: string, separadoId: string, data: any) => {
   const ref = doc(db, `users/${userId}/profiles/${profileId}/separados/${separadoId}`);
-  await updateDoc(ref, data);
+  await updateDoc(ref, {
+    ...data,
+    updatedAt: Timestamp.fromDate(new Date())
+  });
 };
 
 export const deleteSeparado = async (userId: string, profileId: string, separadoId: string) => {
   const ref = doc(db, `users/${userId}/profiles/${profileId}/separados/${separadoId}`);
   await deleteDoc(ref);
+};
+
+export const toggleTransactionDisbursement = async (
+  userId: string,
+  profileId: string,
+  txId: string,
+  newStatus: 'desembolsado' | 'pendiente'
+) => {
+  const txRef = doc(db, `users/${userId}/profiles/${profileId}/transactions/${txId}`);
+  await updateDoc(txRef, {
+    disbursementStatus: newStatus
+  });
+};
+
+/**
+ * Registra un abono a un apartado:
+ * 1. Crea la transacción de ingreso para el flujo de caja del día
+ * 2. Actualiza el totalAbonado del apartado y su lista de abonos
+ */
+export const addAbonoToSeparado = async (
+  userId: string,
+  profileId: string,
+  separadoId: string,
+  separado: { cliente: string; valorTotal: number; totalAbonado: number; abonos?: any[] },
+  abonoData: { amount: number; paymentMethod?: string; note?: string; date?: Date }
+) => {
+  const batch = writeBatch(db);
+  const now = abonoData.date || new Date();
+  const txId = crypto.randomUUID();
+  const txRef = doc(db, `users/${userId}/profiles/${profileId}/transactions/${txId}`);
+
+  // Transacción en flujo de caja del día
+  batch.set(txRef, {
+    amount: abonoData.amount,
+    type: 'ingreso',
+    date: Timestamp.fromDate(now),
+    categoryId: 'abono-separado',
+    description: `Abono apartado: ${separado.cliente}${abonoData.note ? ` - ${abonoData.note}` : ''}`,
+    paymentMethod: abonoData.paymentMethod || 'contado',
+    separadoId,
+    createdAt: Timestamp.fromDate(now)
+  });
+
+  const newTotalAbonado = (separado.totalAbonado || 0) + abonoData.amount;
+  const isCompleted = newTotalAbonado >= separado.valorTotal;
+
+  const abonoItem = {
+    id: txId,
+    amount: abonoData.amount,
+    date: Timestamp.fromDate(now),
+    paymentMethod: abonoData.paymentMethod || 'contado',
+    note: abonoData.note || '',
+    transactionId: txId
+  };
+
+  const sepRef = doc(db, `users/${userId}/profiles/${profileId}/separados/${separadoId}`);
+  batch.update(sepRef, {
+    totalAbonado: newTotalAbonado,
+    estado: isCompleted ? 'completado' : 'pendiente',
+    updatedAt: Timestamp.fromDate(now),
+    abonos: [...(separado.abonos || []), abonoItem]
+  });
+
+  await batch.commit();
+};
+
+/**
+ * Liquida un apartado pagando el 100% del saldo pendiente:
+ * 1. Genera la transacción de ingreso por el saldo restante con el método elegido
+ * 2. Marca el apartado como 'completado'
+ */
+export const liquidateSeparado = async (
+  userId: string,
+  profileId: string,
+  separado: { id: string; cliente: string; valorTotal: number; totalAbonado: number; abonos?: any[] },
+  liquidacionData: {
+    paymentMethod: string;
+    note?: string;
+    date?: Date;
+    grossAmount?: number;
+    netAmount?: number;
+    commissionRate?: number;
+    commissionAmount?: number;
+    disbursementDays?: number;
+    estimatedDisbursementDate?: Date;
+    disbursementStatus?: 'desembolsado' | 'pendiente';
+  }
+) => {
+  const batch = writeBatch(db);
+  const now = liquidacionData.date || new Date();
+  const falta = Math.max(0, separado.valorTotal - (separado.totalAbonado || 0));
+
+  if (falta > 0) {
+    const txId = crypto.randomUUID();
+    const txRef = doc(db, `users/${userId}/profiles/${profileId}/transactions/${txId}`);
+
+    const txPayload: any = {
+      amount: liquidacionData.netAmount !== undefined ? liquidacionData.netAmount : falta,
+      type: 'ingreso',
+      date: Timestamp.fromDate(now),
+      categoryId: 'abono-separado',
+      description: `Liquidación total apartado: ${separado.cliente}${liquidacionData.note ? ` - ${liquidacionData.note}` : ''}`,
+      paymentMethod: liquidacionData.paymentMethod || 'contado',
+      separadoId: separado.id,
+      grossAmount: falta,
+      createdAt: Timestamp.fromDate(now)
+    };
+
+    if (liquidacionData.commissionRate !== undefined) txPayload.commissionRate = liquidacionData.commissionRate;
+    if (liquidacionData.commissionAmount !== undefined) txPayload.commissionAmount = liquidacionData.commissionAmount;
+    if (liquidacionData.netAmount !== undefined) txPayload.netAmount = liquidacionData.netAmount;
+    if (liquidacionData.disbursementDays !== undefined) txPayload.disbursementDays = liquidacionData.disbursementDays;
+    if (liquidacionData.estimatedDisbursementDate) {
+      txPayload.estimatedDisbursementDate = Timestamp.fromDate(new Date(liquidacionData.estimatedDisbursementDate));
+    }
+    if (liquidacionData.disbursementStatus) txPayload.disbursementStatus = liquidacionData.disbursementStatus;
+
+    batch.set(txRef, txPayload);
+
+    const abonoItem = {
+      id: txId,
+      amount: falta,
+      date: Timestamp.fromDate(now),
+      paymentMethod: liquidacionData.paymentMethod || 'contado',
+      note: 'Liquidación final' + (liquidacionData.note ? ` - ${liquidacionData.note}` : ''),
+      transactionId: txId
+    };
+
+    const sepRef = doc(db, `users/${userId}/profiles/${profileId}/separados/${separado.id}`);
+    batch.update(sepRef, {
+      totalAbonado: separado.valorTotal,
+      estado: 'completado',
+      updatedAt: Timestamp.fromDate(now),
+      abonos: [...(separado.abonos || []), abonoItem]
+    });
+  } else {
+    const sepRef = doc(db, `users/${userId}/profiles/${profileId}/separados/${separado.id}`);
+    batch.update(sepRef, {
+      totalAbonado: separado.valorTotal,
+      estado: 'completado',
+      updatedAt: Timestamp.fromDate(now)
+    });
+  }
+
+  await batch.commit();
 };
 
 /**

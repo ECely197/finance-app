@@ -3,14 +3,26 @@ import { collection, query, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAppStore } from '../store/useAppStore';
 
+export interface AbonoItem {
+  id: string;
+  amount: number;
+  date: Date;
+  paymentMethod?: string;
+  note?: string;
+  transactionId?: string;
+}
+
 export interface Separado {
   id: string;
-  fotoUrl: string;
+  fotoUrl?: string;
   valorTotal: number;
   totalAbonado: number;
   cliente: string;
   estado: 'pendiente' | 'completado';
   createdAt?: Date;
+  updatedAt?: Date;
+  initialPaymentMethod?: string;
+  abonos?: AbonoItem[];
 }
 
 export const useSeparadosData = () => {
@@ -29,21 +41,40 @@ export const useSeparadosData = () => {
     const ref = collection(db, `users/${user.uid}/profiles/${currentProfile.id}/separados`);
     const q = query(ref, orderBy('createdAt', 'desc'));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => {
-        const item = doc.data();
-        return {
-          id: doc.id,
-          ...item,
-          createdAt: item.createdAt?.toDate ? item.createdAt.toDate() : (item.createdAt ? new Date(item.createdAt) : undefined)
-        } as Separado;
-      });
-      setSeparados(data);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching separados:", error);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((doc) => {
+          const item = doc.data();
+          return {
+            id: doc.id,
+            ...item,
+            createdAt: item.createdAt?.toDate
+              ? item.createdAt.toDate()
+              : item.createdAt
+              ? new Date(item.createdAt)
+              : undefined,
+            updatedAt: item.updatedAt?.toDate
+              ? item.updatedAt.toDate()
+              : item.updatedAt
+              ? new Date(item.updatedAt)
+              : undefined,
+            abonos: Array.isArray(item.abonos)
+              ? item.abonos.map((ab: any) => ({
+                  ...ab,
+                  date: ab.date?.toDate ? ab.date.toDate() : ab.date ? new Date(ab.date) : new Date(),
+                }))
+              : [],
+          } as Separado;
+        });
+        setSeparados(data);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Error fetching separados:', error);
+        setLoading(false);
+      }
+    );
 
     return () => unsubscribe();
   }, [user, currentProfile]);

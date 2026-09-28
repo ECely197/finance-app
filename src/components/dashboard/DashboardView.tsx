@@ -9,8 +9,9 @@ import { useRecurringExpenses } from '../../hooks/useRecurringExpenses';
 import { useSeparadosData } from '../../hooks/useSeparadosData';
 import { createTransaction, updateSeparado, payRecurringExpense } from '../../lib/firestore';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownRight, ArrowUpRight, Filter, Target, Package, Plus, DollarSign, X, Tag, Calendar as CalendarIcon, Clock, ChevronDown, Sunset, ShieldCheck, CheckCircle2, ChevronUp } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Filter, Target, Package, Plus, DollarSign, X, Tag, Calendar as CalendarIcon, Clock, ChevronDown, Sunset, ShieldCheck, CheckCircle2, ChevronUp, Edit2 } from 'lucide-react';
 import { MiniCalendar } from '../ui/MiniCalendar';
+import { EditApartadoModal } from '../transactions/EditApartadoModal';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
 
@@ -79,6 +80,7 @@ export const DashboardView = () => {
   const [abonoModalId, setAbonoModalId] = useState<string | null>(null);
   const [abonoMonto, setAbonoMonto] = useState('');
   const [isAbonando, setIsAbonando] = useState(false);
+  const [selectedEditingSeparado, setSelectedEditingSeparado] = useState<any | null>(null);
 
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 1024);
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
@@ -574,6 +576,14 @@ export const DashboardView = () => {
                                     <h4 className="font-extrabold text-slate-800 text-[15px] truncate">{sep.cliente}</h4>
                                     <p className="text-[12px] font-bold text-slate-400 tracking-wide mt-0.5">TOTAL: {formatCurrency(sep.valorTotal)}</p>
                                  </div>
+                                 <button
+                                    type="button"
+                                    onClick={() => setSelectedEditingSeparado(sep)}
+                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shrink-0"
+                                    title="Editar Apartado (Total, Abonos, Liquidar)"
+                                 >
+                                    <Edit2 size={16} />
+                                 </button>
                               </div>
 
                               <div className="relative z-10 mb-5">
@@ -1304,6 +1314,13 @@ export const DashboardView = () => {
            </div>
         )}
       </AnimatePresence>
+
+      {/* Edit Apartado Modal */}
+      <EditApartadoModal
+        separado={selectedEditingSeparado}
+        isOpen={Boolean(selectedEditingSeparado)}
+        onClose={() => setSelectedEditingSeparado(null)}
+      />
     </>
   );
 };

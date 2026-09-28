@@ -3,10 +3,30 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../../store/useAppStore';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { getCategories, deleteTransaction, updateTransaction } from '../../lib/firestore';
-import { Search, Trash2, Pencil, Filter, Tag, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, Briefcase, X, CheckCircle, ChevronDown, Clock } from 'lucide-react';
+import { getCategories, deleteTransaction, updateTransaction, toggleTransactionDisbursement } from '../../lib/firestore';
+import {
+  Search,
+  Trash2,
+  Pencil,
+  Filter,
+  Tag,
+  Calendar as CalendarIcon,
+  ArrowUpRight,
+  ArrowDownRight,
+  Briefcase,
+  X,
+  CheckCircle,
+  ChevronDown,
+  Clock,
+  CreditCard,
+  Package,
+  Edit2,
+  Hourglass,
+} from 'lucide-react';
 import { Ripple } from '../ui/Ripple';
 import { MiniCalendar } from '../ui/MiniCalendar';
+import { useSeparadosData, type Separado } from '../../hooks/useSeparadosData';
+import { EditApartadoModal } from './EditApartadoModal';
 
 export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean }) => {
   const { user, currentProfile } = useAppStore();
@@ -37,6 +57,42 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
   const [editTipo, setEditTipo] = useState('ingreso');
   const [editDate, setEditDate] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Separados & Payment Gateways state
+  const { separados } = useSeparadosData();
+  const [editingApartado, setEditingApartado] = useState<Separado | null>(null);
+
+  const handleToggleDisbursement = async (tx: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user || !currentProfile) return;
+    const newStatus = tx.disbursementStatus === 'desembolsado' ? 'pendiente' : 'desembolsado';
+    try {
+      await toggleTransactionDisbursement(user.uid, currentProfile.id, tx.id, newStatus);
+      setToastMsg(`Estado cambiado a: ${newStatus === 'desembolsado' ? 'Desembolsado' : 'Pendiente'}`);
+      setTimeout(() => setToastMsg(''), 3000);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleOpenApartadoEdit = (tx: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    let found = separados.find((s) => s.id === tx.separadoId);
+    if (!found) {
+      found = separados.find((s) => tx.description?.toLowerCase().includes(s.cliente?.toLowerCase()));
+    }
+    if (!found) {
+      found = {
+        id: tx.separadoId || tx.id,
+        cliente: tx.description?.replace('Abono apartado: ', '').replace('Abono a separado: ', '') || 'Apartado',
+        valorTotal: tx.grossAmount || tx.amount,
+        totalAbonado: tx.amount,
+        estado: 'pendiente',
+        createdAt: tx.date?.toDate ? tx.date.toDate() : new Date(),
+      } as Separado;
+    }
+    setEditingApartado(found);
+  };
 
   useEffect(() => {
      if (!user || !currentProfile) return;
@@ -81,6 +137,9 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
             if (activeFilter === 'Gastos Variables') return t.type === 'gasto_variable';
             if (activeFilter === 'Innecesarios') return t.type === 'gasto_innecesario';
             if (activeFilter === 'Inversiones') return t.type === 'inversion';
+            if (activeFilter === 'Apartados') {
+               return t.paymentMethod === 'apartado' || Boolean(t.separadoId) || t.categoryId === 'abono-separado' || (t.description && t.description.toLowerCase().includes('apartado')) || (t.description && t.description.toLowerCase().includes('separado'));
+            }
             return true;
          });
       }
@@ -226,7 +285,7 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
             {/* Top Row: Smart Chips (Type Filters) */}
             <div className="w-full">
                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide md:flex-wrap">
-                  {['Todos', 'Ingresos', 'Gastos Fijos', 'Gastos Variables', 'Innecesarios', 'Inversiones'].map(filter => {
+                  {['Todos', 'Ingresos', 'Gastos Fijos', 'Gastos Variables', 'Innecesarios', 'Inversiones', 'Apartados'].map(filter => {
                      const isActive = activeFilter === filter;
                      return (
                         <button 
@@ -489,11 +548,41 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
                               {icon}
                            </div>
                            <div className="flex-1 min-w-0">
-                               <div className="flex items-center gap-2 mb-1.5">
+                               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                   <span className={`text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded-lg flex items-center gap-1 ${badgeBg}`}>
                                      <Tag size={10} />
                                      {categories[tx.categoryId] || 'General'}
                                   </span>
+                                  {tx.paymentMethod && (
+                                     <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-lg flex items-center gap-1 ${
+                                        tx.paymentMethod === 'addi' ? 'bg-blue-100 text-blue-700' :
+                                        tx.paymentMethod === 'sistecredito' ? 'bg-indigo-100 text-indigo-700' :
+                                        tx.paymentMethod === 'tarjeta' ? 'bg-purple-100 text-purple-700' :
+                                        tx.paymentMethod === 'apartado' ? 'bg-amber-100 text-amber-700' :
+                                        'bg-slate-100 text-slate-700'
+                                     }`}>
+                                        {tx.paymentMethod === 'apartado' ? <Package size={10} /> : <CreditCard size={10} />}
+                                        {tx.paymentMethod === 'addi' ? 'Addi' :
+                                         tx.paymentMethod === 'sistecredito' ? 'Sistecrédito' :
+                                         tx.paymentMethod === 'tarjeta' ? 'Tarjeta' :
+                                         tx.paymentMethod === 'apartado' ? 'Apartado' : 'Contado'}
+                                     </span>
+                                  )}
+                                  {tx.disbursementStatus && (
+                                     <button
+                                        type="button"
+                                        onClick={(e) => handleToggleDisbursement(tx, e)}
+                                        className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md flex items-center gap-1 transition-all ${
+                                           tx.disbursementStatus === 'desembolsado'
+                                             ? 'bg-emerald-100 text-emerald-800'
+                                             : 'bg-amber-100 text-amber-800 hover:bg-emerald-100 hover:text-emerald-800'
+                                        }`}
+                                        title="Clic para cambiar estado de desembolso"
+                                     >
+                                        <Hourglass size={10} />
+                                        {tx.disbursementStatus === 'desembolsado' ? 'Desembolsado' : 'Pendiente'}
+                                     </button>
+                                  )}
                                   {tx.inversionIdRelacionada && (
                                      <span className="text-[10px] font-extrabold uppercase bg-emerald-50 text-emerald-600 border border-emerald-100 px-2.5 py-0.5 rounded-lg flex items-center gap-1">
                                         ROI
@@ -501,6 +590,15 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
                                   )}
                                </div>
                                <h4 className="text-base font-extrabold text-slate-800 line-clamp-1 mb-1">{tx.description || <span className="text-slate-400 font-semibold italic">Monto sin descripción de detalles.</span>}</h4>
+                               {tx.grossAmount && tx.commissionAmount > 0 && (
+                                  <p className="text-[11px] font-bold text-slate-400 mb-1 flex flex-wrap items-center gap-2">
+                                     <span>Bruto: {formatCurrency(tx.grossAmount)}</span>
+                                     <span>•</span>
+                                     <span className="text-rose-500">Comisión ({tx.commissionRate || 0}%): -{formatCurrency(tx.commissionAmount)}</span>
+                                     <span>•</span>
+                                     <span className="text-emerald-600 font-extrabold">Neto: {formatCurrency(tx.netAmount || tx.amount)}</span>
+                                  </p>
+                               )}
                                <p className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wide">
                                   <Clock size={11} className="text-slate-300" />
                                   {formatDate(tx.date)}
@@ -516,6 +614,15 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
                               <span className="text-[10px] font-black uppercase text-slate-300 tracking-widest sm:text-right mt-0.5">{tx.type}</span>
                            </div>
                            <div className="flex items-center gap-1 shrink-0 mt-1">
+                           {(tx.paymentMethod === 'apartado' || Boolean(tx.separadoId) || tx.categoryId === 'abono-separado') && (
+                             <button 
+                               onClick={(e) => handleOpenApartadoEdit(tx, e)}
+                               className="p-2 sm:p-2.5 text-amber-500 hover:text-amber-700 hover:bg-amber-50 rounded-xl transition-colors shrink-0 outline-none"
+                               title="Editar Apartado completo"
+                             >
+                                <Edit2 size={17} strokeWidth={2.3}/>
+                             </button>
+                           )}
                            <button 
                              onClick={(e) => handleOpenEdit(tx, e)}
                              className="p-2 sm:p-2.5 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-colors shrink-0 outline-none"
@@ -628,6 +735,13 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
             </motion.div>
          )}
       </AnimatePresence>
+
+      {/* Edit Apartado Modal */}
+      <EditApartadoModal
+        separado={editingApartado}
+        isOpen={Boolean(editingApartado)}
+        onClose={() => setEditingApartado(null)}
+      />
 
     </div>
   );
