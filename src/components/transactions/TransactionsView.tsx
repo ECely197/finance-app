@@ -26,6 +26,12 @@ import { Ripple } from '../ui/Ripple';
 import { MiniCalendar } from '../ui/MiniCalendar';
 import { useSeparadosData, type Separado } from '../../hooks/useSeparadosData';
 import { EditApartadoModal } from './EditApartadoModal';
+import {
+  formatToColombiaDate,
+  createColombiaDateTime,
+  getColombiaRangeBounds,
+  formatColombiaDateTimeDisplay
+} from '../../utils/dateUtils';
 
 const ONE_UI_SPRING = {
   type: "spring" as const,
@@ -34,41 +40,7 @@ const ONE_UI_SPRING = {
 };
 
 const getTimeRangeBounds = (range: string, customStart?: string, customEnd?: string) => {
-  const now = new Date();
-  let start: Date | null = new Date();
-  let end: Date | null = new Date();
-
-  switch (range) {
-    case 'today':
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      break;
-    case 'last_7_days':
-      start.setDate(now.getDate() - 6);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      break;
-    case 'this_month':
-      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      break;
-    case 'last_month':
-      start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-      break;
-    case 'all':
-      start = null;
-      end = null;
-      break;
-    case 'custom':
-      start = customStart ? new Date(customStart + 'T00:00:00') : null;
-      end = customEnd ? new Date(customEnd + 'T23:59:59') : null;
-      break;
-    default:
-      start = null;
-      end = null;
-  }
-  return { start, end };
+  return getColombiaRangeBounds(range, customStart, customEnd);
 };
 
 export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean }) => {
@@ -274,8 +246,7 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
       setEditCat(tx.categoryId || '');
       setEditTipo(tx.type || 'ingreso');
       
-      const dateObj = tx.date?.toDate ? tx.date.toDate() : new Date(tx.date.seconds * 1000);
-      setEditDate(dateObj.toISOString().split('T')[0]);
+      setEditDate(formatToColombiaDate(tx.date));
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
@@ -283,9 +254,7 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
      if (!user || !currentProfile || !editingTx || !editMonto || !editCat || !editTipo || !editDate) return;
      setIsUpdating(true);
      try {
-        const selectedDate = new Date(editDate + 'T00:00:00');
-        const now = new Date();
-        selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+        const selectedDate = createColombiaDateTime(editDate);
 
         await updateTransaction(user.uid, currentProfile.id, editingTx.id, {
            amount: parseFloat(editMonto),
@@ -326,11 +295,7 @@ export const TransactionsView = ({ hideHeader = false }: { hideHeader?: boolean 
   const formatCurrency = (val: number) => `$${val.toLocaleString('es-CO', { minimumFractionDigits: 0 })}`;
   
   const formatDate = (dateObj: any) => {
-     if (!dateObj) return '';
-     const d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj.seconds * 1000);
-     const datePart = d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
-     const timePart = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
-     return `${datePart} • ${timePart}`;
+     return formatColombiaDateTimeDisplay(dateObj);
   };
 
   const containerVariants = {

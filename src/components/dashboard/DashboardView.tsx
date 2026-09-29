@@ -12,42 +12,14 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowDownRight, ArrowUpRight, Filter, Target, Package, Plus, DollarSign, X, Tag, Calendar as CalendarIcon, Clock, ChevronDown, Sunset, ShieldCheck, CheckCircle2, ChevronUp, Edit2 } from 'lucide-react';
 import { MiniCalendar } from '../ui/MiniCalendar';
 import { EditApartadoModal } from '../transactions/EditApartadoModal';
+import { getTodayColombia, createColombiaDateTime, getColombiaRangeBounds, formatToColombiaDate } from '../../utils/dateUtils';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#ef4444', '#06b6d4'];
 
-const startOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
+const startOfMonth = (_date?: Date) => getColombiaRangeBounds('this_month').start || new Date();
 
 const getRangeDates = (range: string, customStart?: string, customEnd?: string) => {
-  const now = new Date();
-  let start = new Date();
-  let end = new Date();
-
-  switch (range) {
-    case 'today':
-      start.setHours(0,0,0,0);
-      end.setHours(23,59,59,999);
-      break;
-    case 'last_7_days':
-      start.setDate(now.getDate() - 6); // 7 items total, incl today
-      start.setHours(0,0,0,0);
-      end.setHours(23,59,59,999);
-      break;
-    case 'this_month':
-      start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-      break;
-    case 'last_month':
-      start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
-      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-      break;
-    case 'custom':
-      if (customStart && customEnd) {
-         start = new Date(customStart + 'T00:00:00');
-         end = new Date(customEnd + 'T23:59:59');
-      }
-      break;
-  }
-  return { startStr: start.toISOString(), endStr: end.toISOString() };
+  return getColombiaRangeBounds(range, customStart, customEnd);
 };
 
 export const DashboardView = () => {
@@ -176,13 +148,14 @@ export const DashboardView = () => {
         const amount = Number(abonoMonto);
         const newTotal = separado.totalAbonado + amount;
         const txId = crypto.randomUUID();
+        const nowColombia = createColombiaDateTime(getTodayColombia());
 
         // Registrar ingreso del abono
         await createTransaction(user.uid, currentProfile.id, txId, {
            amount,
            type: 'ingreso',
            categoryId: 'abono-separado',
-           date: new Date(),
+           date: nowColombia,
            description: `Abono a separado: ${separado.cliente}`,
         });
 
@@ -209,20 +182,18 @@ export const DashboardView = () => {
   const dailyEvolutionData = useMemo(() => {
     const rangeStart = new Date(startStr);
     const rangeEnd = new Date(endStr);
-    rangeStart.setHours(0,0,0,0);
-    rangeEnd.setHours(23,59,59,999);
 
     const dayMap: Record<string, { income: number, expense: number, dateObj: Date }> = {};
     
     // Safety net against massive date ranges breaking the loop (cap at 365 days)
     const diffTime = Math.abs(rangeEnd.getTime() - rangeStart.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const safeDays = Math.min(diffDays, 365);
+    const safeDays = Math.max(1, Math.min(diffDays, 365));
     
-    // Fill all days to ensure unbroken timeline
-    let curr = new Date(rangeStart);
+    // Fill all days to ensure unbroken timeline using Colombia timezone
+    let curr = new Date(rangeStart.getTime() + 1000 * 60 * 60 * 5); // Shift to noon COT
     for (let i = 0; i < safeDays; i++) {
-       const key = curr.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+       const key = curr.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'America/Bogota' });
        // Use a stable snapshot of the date
        dayMap[key] = { income: 0, expense: 0, dateObj: new Date(curr) };
        curr.setDate(curr.getDate() + 1);
@@ -231,7 +202,7 @@ export const DashboardView = () => {
     transactions.forEach(tx => {
        const txDate = tx.date?.toDate ? tx.date.toDate() : new Date(tx.date.seconds * 1000);
        if (txDate >= rangeStart && txDate <= rangeEnd) {
-          const key = txDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+          const key = txDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'America/Bogota' });
           if (dayMap[key]) {
              if (tx.type === 'ingreso') {
                 dayMap[key].income += tx.amount;
@@ -254,10 +225,13 @@ export const DashboardView = () => {
   // Bar Chart: Income by Day of the Week (Lunes a Domingo)
   const weekdaysChart = useMemo(() => {
     const acc = [0,0,0,0,0,0,0]; // Dom is 0
+    const dayIdxMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
     transactions.forEach(tx => {
       if (tx.type === 'ingreso') {
         const d = tx.date?.toDate ? tx.date.toDate() : new Date(tx.date.seconds * 1000);
-        acc[d.getDay()] += tx.amount;
+        const dayStr = d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/Bogota' });
+        const dayIdx = dayIdxMap[dayStr] ?? d.getDay();
+        acc[dayIdx] += tx.amount;
       }
     });
     const ordered = [
@@ -325,13 +299,10 @@ export const DashboardView = () => {
   // Selected Day Transactions for Modal
   const selectedDayTransactions = useMemo(() => {
      if (!selectedDayObj) return [];
-     const y = selectedDayObj.getFullYear();
-     const m = selectedDayObj.getMonth();
-     const d = selectedDayObj.getDate();
+     const targetDayStr = formatToColombiaDate(selectedDayObj);
      
      return transactions.filter(tx => {
-         const txDate = tx.date?.toDate ? tx.date.toDate() : new Date(tx.date.seconds * 1000);
-         return txDate.getFullYear() === y && txDate.getMonth() === m && txDate.getDate() === d;
+         return formatToColombiaDate(tx.date) === targetDayStr;
      }).sort((a,b) => {
          const dA = a.date?.toDate ? a.date.toDate() : new Date(a.date.seconds * 1000);
          const dB = b.date?.toDate ? b.date.toDate() : new Date(b.date.seconds * 1000);
@@ -1277,7 +1248,7 @@ export const DashboardView = () => {
                      <div>
                        <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">Cierre del Día</h3>
                        <p className="text-slate-500 font-bold mt-1 text-sm bg-[#0381FE]/10 text-[#0381FE] dark:text-[#387AFF] inline-block px-3 py-1 rounded-full uppercase tracking-widest">
-                          {selectedDayObj?.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                          {selectedDayObj?.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Bogota' })}
                        </p>
                      </div>
                      <button onClick={() => setSelectedDayObj(null)} className="p-2.5 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-500 dark:text-zinc-400 rounded-full transition-colors flex-shrink-0 active:scale-90">

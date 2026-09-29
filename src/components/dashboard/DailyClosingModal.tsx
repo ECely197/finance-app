@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { useProjectsData } from '../../hooks/useProjectsData';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import { getColombiaRangeBounds } from '../../utils/dateUtils';
 
 import { Confetti } from '../ui/Confetti';
 
@@ -22,11 +23,9 @@ export const DailyClosingModal = ({ isOpen, onClose }: { isOpen: boolean, onClos
         const fetchData = async () => {
             setLoading(true);
             try {
-                // Get today's range
-                const startOfDay = new Date();
-                startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date();
-                endOfDay.setHours(23, 59, 59, 999);
+                // Get today's range in Colombia (UTC-5)
+                const { start: startOfDay, end: endOfDay } = getColombiaRangeBounds('today');
+                if (!startOfDay || !endOfDay) return;
 
                 // Query today's transactions
                 const txRef = collection(db, `users/${user.uid}/profiles/${currentProfile.id}/transactions`);

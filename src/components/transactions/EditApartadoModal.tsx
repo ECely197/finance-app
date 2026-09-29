@@ -16,6 +16,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { updateSeparado, deleteSeparado, addAbonoToSeparado, liquidateSeparado } from '../../lib/firestore';
 import type { Separado } from '../../hooks/useSeparadosData';
 import { usePaymentMethods } from '../../hooks/usePaymentMethods';
+import { getTodayColombia, createColombiaDateTime, formatColombiaShort } from '../../utils/dateUtils';
 
 interface EditApartadoModalProps {
   separado: Separado | null;
@@ -42,7 +43,7 @@ export const EditApartadoModal: React.FC<EditApartadoModalProps> = ({
   const [abonoAmount, setAbonoAmount] = useState('');
   const [abonoMethod, setAbonoMethod] = useState('contado');
   const [abonoNote, setAbonoNote] = useState('');
-  const [abonoDate, setAbonoDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [abonoDate, setAbonoDate] = useState(() => getTodayColombia());
   const [isSubmittingAbono, setIsSubmittingAbono] = useState(false);
   const [showAbonoForm, setShowAbonoForm] = useState(false);
 
@@ -139,9 +140,7 @@ export const EditApartadoModal: React.FC<EditApartadoModalProps> = ({
 
     setIsSubmittingAbono(true);
     try {
-      const selectedDate = new Date(abonoDate + 'T00:00:00');
-      const now = new Date();
-      selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+      const selectedDate = createColombiaDateTime(abonoDate);
 
       await addAbonoToSeparado(
         user.uid,
@@ -694,7 +693,7 @@ export const EditApartadoModal: React.FC<EditApartadoModalProps> = ({
                       </div>
                     </div>
                     <span className="text-[10px] font-bold text-slate-400">
-                      {ab.date ? new Date(ab.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : 'Reciente'}
+                      {ab.date ? formatColombiaShort(ab.date) : 'Reciente'}
                     </span>
                   </div>
                 ))}

@@ -5,6 +5,7 @@ import { useNotesData } from '../../hooks/useNotesData';
 import { useAppStore } from '../../store/useAppStore';
 import { createTask } from '../../lib/firestore';
 import { ChevronLeft, ChevronRight, CheckCircle2, Circle, Plus, X, MessageSquare } from 'lucide-react';
+import { formatToColombiaDate, parseSafeDate } from '../../utils/dateUtils';
 
 export const CalendarView = () => {
     const { user, currentProfile } = useAppStore();
@@ -30,9 +31,7 @@ export const CalendarView = () => {
 
     // Helper para solucionar desfase horario (UTC-5 Colombia fix)
     const getLocalDateStr = (d: Date) => {
-        const tzOffset = d.getTimezoneOffset() * 60000;
-        const localTime = new Date(d.getTime() - tzOffset);
-        return localTime.toISOString().split('T')[0];
+        return formatToColombiaDate(d);
     };
 
     const previousPeriod = () => {
@@ -320,7 +319,7 @@ export const CalendarView = () => {
 
                             <div className="flex justify-between items-center mb-6">
                                 <div>
-                                    <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Tarea para el {new Date(selectedDate + 'T12:00:00').toLocaleDateString()}</h2>
+                                    <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Tarea para el {parseSafeDate(selectedDate).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}</h2>
                                     <p className="text-xs font-medium text-slate-500 dark:text-zinc-400 mt-1">Se vinculará a un Proyecto existente</p>
                                 </div>
                                 <button onClick={() => setShowModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-400">
@@ -406,7 +405,7 @@ export const CalendarView = () => {
                         <div className="p-6 border-b border-black/5 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-white/[0.02]">
                             <div>
                                 <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">Agenda</h3>
-                                <p className="text-sm font-semibold text-slate-500 dark:text-zinc-400">{selectedDate && new Date(selectedDate + 'T12:00:00').toLocaleDateString()}</p>
+                                <p className="text-sm font-semibold text-slate-500 dark:text-zinc-400">{selectedDate && parseSafeDate(selectedDate).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}</p>
                             </div>
                             <button onClick={() => setShowDayDetail(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors text-slate-400">
                                 <X size={20} />

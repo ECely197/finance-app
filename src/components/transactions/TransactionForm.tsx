@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { usePaymentMethods } from '../../hooks/usePaymentMethods';
+import { getTodayColombia, createColombiaDateTime, parseSafeDate } from '../../utils/dateUtils';
 
 const transactionTypes = [
   { id: 'ingreso', label: 'Ingreso', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
@@ -43,7 +44,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
   const [selectedProfileId, setSelectedProfileId] = useState(currentProfile?.id || '');
   const [type, setType] = useState('ingreso');
   const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => getTodayColombia());
   const [categoryId, setCategoryId] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
 
@@ -150,7 +151,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
   const activeRateNum = customCommissionRate !== '' ? parseFloat(customCommissionRate) || 0 : activeMethodConfig?.commissionPercent || 0;
   
   const gatewayBreakdown = useMemo(() => {
-    const saleDate = new Date(date + 'T12:00:00');
+    const saleDate = parseSafeDate(date);
     return calculatePaymentBreakdown(
       grossNum,
       activeRateNum,
@@ -178,6 +179,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
       day: 'numeric',
       month: 'short',
       year: 'numeric',
+      timeZone: 'America/Bogota',
     });
   };
 
@@ -210,20 +212,20 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
           fotoUrl = await uploadSeparadoImage(user.uid, selectedProfileId, fotoProd);
         }
 
-        const now = new Date();
+        const selectedDate = createColombiaDateTime(date);
         nuevoSeparadoId = await createSeparado(user.uid, selectedProfileId, {
           fotoUrl,
           valorTotal: Number(valorTotal),
           totalAbonado: parseFloat(amount),
           cliente: description.trim() || 'Apartado sin descripción',
           estado: parseFloat(amount) >= Number(valorTotal) ? 'completado' : 'pendiente',
-          createdAt: now,
+          createdAt: selectedDate,
           initialPaymentMethod: 'apartado',
           abonos: [
             {
               id: txId,
               amount: parseFloat(amount),
-              date: now,
+              date: selectedDate,
               paymentMethod: 'apartado (abono inicial)',
               note: 'Abono inicial en caja',
               transactionId: txId,
@@ -232,9 +234,8 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
         });
       }
 
-      const selectedDate = new Date(date + 'T00:00:00');
+      const selectedDate = createColombiaDateTime(date);
       const now = new Date();
-      selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
 
       // Prepare transaction data according to ERP standards
       let finalAmount = parseFloat(amount);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getTodayColombia, formatToColombiaDate, parseSafeDate } from '../../utils/dateUtils';
 
 interface MiniCalendarProps {
   selectedDate: string;
@@ -9,7 +10,7 @@ interface MiniCalendarProps {
 
 export const MiniCalendar = ({ selectedDate, onSelect, onClose }: MiniCalendarProps) => {
   const [viewDate, setViewDate] = useState(() => 
-    selectedDate ? new Date(selectedDate + 'T12:00:00') : new Date()
+    selectedDate ? parseSafeDate(selectedDate) : new Date()
   );
   
   const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -26,20 +27,21 @@ export const MiniCalendar = ({ selectedDate, onSelect, onClose }: MiniCalendarPr
   const currentMonthDays = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const nextMonthDays = Array.from({ length: 42 - (prevMonthDays.length + currentMonthDays.length) }, (_, i) => i + 1);
 
+  const todayStr = getTodayColombia();
   const isToday = (d: number) => {
-    const today = new Date();
-    return today.getDate() === d && today.getMonth() === month && today.getFullYear() === year;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${year}-${pad(month + 1)}-${pad(d)}` === todayStr;
   };
 
   const isSelected = (d: number) => {
     if (!selectedDate) return false;
-    const sel = new Date(selectedDate + 'T12:00:00');
-    return sel.getDate() === d && sel.getMonth() === month && sel.getFullYear() === year;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${year}-${pad(month + 1)}-${pad(d)}` === selectedDate;
   };
 
   const handleDayClick = (day: number, mOffset = 0) => {
-    const targetDate = new Date(year, month + mOffset, day, 12);
-    onSelect(targetDate.toISOString().slice(0, 10));
+    const targetDate = new Date(year, month + mOffset, day, 12, 0, 0);
+    onSelect(formatToColombiaDate(targetDate));
   };
 
   return (
@@ -91,7 +93,7 @@ export const MiniCalendar = ({ selectedDate, onSelect, onClose }: MiniCalendarPr
       </div>
 
       <div className="flex gap-2 mt-4 pt-3 border-t border-slate-50">
-        <button onClick={() => onSelect(new Date().toISOString().slice(0, 10))} className="flex-1 py-2 text-[9px] font-black uppercase text-blue-500 hover:bg-blue-50 rounded-xl transition-colors">Hoy</button>
+        <button onClick={() => onSelect(getTodayColombia())} className="flex-1 py-2 text-[9px] font-black uppercase text-blue-500 hover:bg-blue-50 rounded-xl transition-colors">Hoy</button>
         <button onClick={onClose} className="flex-1 py-2 text-[9px] font-black uppercase text-slate-400 hover:bg-slate-50 rounded-xl transition-colors">Limpiar</button>
       </div>
     </div>

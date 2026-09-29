@@ -1,5 +1,6 @@
 import { collection, doc, setDoc, getDocs, updateDoc, deleteDoc, addDoc, query, where, Timestamp, writeBatch, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
+import { getTodayColombia, createColombiaDateTime } from '../utils/dateUtils';
 
 export interface Profile {
   id?: string;
@@ -326,7 +327,7 @@ export const addAbonoToSeparado = async (
   abonoData: { amount: number; paymentMethod?: string; note?: string; date?: Date }
 ) => {
   const batch = writeBatch(db);
-  const now = abonoData.date || new Date();
+  const now = abonoData.date || createColombiaDateTime(getTodayColombia());
   const txId = crypto.randomUUID();
   const txRef = doc(db, `users/${userId}/profiles/${profileId}/transactions/${txId}`);
 
@@ -388,7 +389,7 @@ export const liquidateSeparado = async (
   }
 ) => {
   const batch = writeBatch(db);
-  const now = liquidacionData.date || new Date();
+  const now = liquidacionData.date || createColombiaDateTime(getTodayColombia());
   const falta = Math.max(0, separado.valorTotal - (separado.totalAbonado || 0));
 
   if (falta > 0) {
@@ -460,7 +461,7 @@ export const payRecurringExpense = async (
   
   // 1. Crear la transacción
   const txRef = doc(collection(db, `users/${userId}/profiles/${profileId}/transactions`));
-  const now = new Date();
+  const now = createColombiaDateTime(getTodayColombia());
   
   batch.set(txRef, {
     amount: expense.monto,
