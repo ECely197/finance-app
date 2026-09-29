@@ -25,14 +25,14 @@ export const ProductivityWorkspace = () => {
     ] as const;
 
     return (
-        <div className={`min-h-screen text-slate-800 flex flex-col relative overflow-hidden transition-colors duration-500 ${isFocusModeActive ? 'bg-slate-900 border-none' : 'bg-[#F8FAFC]'}`}>
+        <div className={`min-h-screen text-slate-900 dark:text-white flex flex-col relative overflow-hidden transition-colors duration-500 ${isFocusModeActive ? 'bg-black border-none' : 'bg-[#F2F2F7] dark:bg-black'}`}>
             
             {/* Modo Enfoque Header */}
             {isFocusModeActive && (
                 <motion.div 
                     initial={{ y: -50, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    className="sticky top-0 z-[100] bg-slate-900 w-full flex items-center justify-between p-4 md:px-8 border-b border-slate-800 shadow-2xl"
+                    className="sticky top-0 z-[100] bg-black/90 backdrop-blur-2xl w-full flex items-center justify-between p-4 md:px-8 border-b border-white/10 shadow-2xl"
                 >
                     <div className="flex items-center gap-6">
                         <FocusTimer isDark={true} />
@@ -43,7 +43,7 @@ export const ProductivityWorkspace = () => {
                     </div>
                     <button 
                         onClick={handleExitFocusMode}
-                        className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white px-4 py-2 rounded-xl transition-all font-bold text-sm"
+                        className="flex items-center gap-2 bg-rose-500/15 hover:bg-rose-500 text-rose-400 hover:text-white px-4 py-2 rounded-full transition-all font-bold text-sm active:scale-95"
                     >
                         <ZapOff size={16} /> Salir del Enfoque
                     </button>
@@ -52,37 +52,37 @@ export const ProductivityWorkspace = () => {
 
             {/* Header Normal */}
             {!isFocusModeActive && (
-                <header className="bg-[#F8FAFC] px-6 pt-6 pb-0 shrink-0">
+                <header className="bg-transparent px-6 pt-6 sm:pt-10 pb-2 shrink-0">
                     {/* Title row */}
                     <div className="flex items-center justify-between mb-5">
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Segundo Cerebro</h1>
-                            <p className="text-xs font-semibold text-slate-400 mt-0.5">Tu espacio focalizado libre de distracciones.</p>
+                            <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">Segundo Cerebro</h1>
+                            <p className="text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 mt-1">Tu espacio focalizado libre de distracciones.</p>
                         </div>
                         <div className="flex items-center gap-3">
                             <FocusTimer isDark={false} />
                             <button 
                                 onClick={() => setIsFocusModeActive(true)}
-                                className="hidden md:flex items-center gap-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-4 py-2.5 rounded-xl transition-all font-bold text-sm border border-emerald-100"
+                                className="hidden md:flex items-center gap-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-teal-400 text-white hover:brightness-110 px-5 py-2.5 rounded-full transition-all font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95"
                             >
-                                <Zap size={15} strokeWidth={2.5}/> Modo Enfoque
+                                <Zap size={14} strokeWidth={2.5}/> Modo Enfoque
                             </button>
                         </div>
                     </div>
 
-                    {/* ── Segmented Control Tab Bar (fixed width, no scroll) ── */}
-                    <div className="flex w-full bg-slate-100 rounded-2xl p-1 gap-1">
+                    {/* ── Segmented Control Tab Bar (One UI 9.0 Capsule) ── */}
+                    <div className="flex w-full bg-slate-200/70 dark:bg-[#1C1C1E] rounded-full p-1.5 gap-1.5 shadow-inner">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
                                 onClick={() => setWorkspaceActiveTab(tab.id)}
-                                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-bold text-xs transition-all duration-200 relative overflow-hidden ${
+                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full font-bold text-xs transition-all duration-200 relative overflow-hidden active:scale-[0.96] ${
                                     workspaceActiveTab === tab.id
-                                        ? 'bg-white text-slate-800 shadow-sm'
-                                        : 'text-slate-400 hover:text-slate-600'
+                                        ? 'bg-white dark:bg-[#252528] text-[#0381FE] dark:text-[#387AFF] shadow-sm font-extrabold'
+                                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                                 }`}
                             >
-                                <tab.icon size={14} strokeWidth={workspaceActiveTab === tab.id ? 2.5 : 2} />
+                                <tab.icon size={15} strokeWidth={workspaceActiveTab === tab.id ? 2.5 : 2} />
                                 <span className="hidden sm:inline">{tab.label}</span>
                             </button>
                         ))}
@@ -92,16 +92,16 @@ export const ProductivityWorkspace = () => {
                     <div className="mt-3 md:hidden">
                         <button 
                             onClick={() => setIsFocusModeActive(true)}
-                            className="w-full flex items-center justify-center gap-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-4 py-2.5 rounded-xl transition-all font-bold text-sm border border-emerald-100"
+                            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-teal-400 text-white px-4 py-2.5 rounded-full transition-all font-bold text-xs shadow-md shadow-blue-500/20 active:scale-95"
                         >
-                            <Zap size={15} strokeWidth={2.5}/> Modo Enfoque
+                            <Zap size={14} strokeWidth={2.5}/> Modo Enfoque
                         </button>
                     </div>
                 </header>
             )}
 
-            {/* Main Content (mb-24 so the shared bottom nav doesn't overlap) */}
-            <main className={`flex-1 overflow-hidden flex flex-col relative w-full h-full mb-24 ${isFocusModeActive ? 'bg-slate-900' : 'bg-[#F8FAFC]'}`}>
+            {/* Main Content (mb-28 so the One UI floating dock doesn't overlap) */}
+            <main className={`flex-1 overflow-hidden flex flex-col relative w-full h-full mb-28 sm:mb-24 ${isFocusModeActive ? 'bg-black' : 'bg-[#F2F2F7] dark:bg-black'}`}>
                 <AnimatePresence mode="wait">
                     <motion.div 
                         key={workspaceActiveTab}

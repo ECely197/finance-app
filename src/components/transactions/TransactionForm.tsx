@@ -45,6 +45,15 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [categoryId, setCategoryId] = useState('');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+
+  const toggleCategory = (catId: string) => {
+    setSelectedCategoryIds(prev => {
+      const next = prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId];
+      setCategoryId(next[0] || '');
+      return next;
+    });
+  };
   const [description, setDescription] = useState('');
   const [inversionIdRelacionada, setInversionIdRelacionada] = useState('');
 
@@ -229,11 +238,19 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
 
       // Prepare transaction data according to ERP standards
       let finalAmount = parseFloat(amount);
+      const effectiveCatIds = selectedCategoryIds.length > 0 ? selectedCategoryIds : (categoryId ? [categoryId] : []);
+      const selectedCatNames = effectiveCatIds.map(id => categories.find(c => c.id === id)?.name || id);
+      const primaryCategoryId = effectiveCatIds[0] || '';
+      const categoryString = selectedCatNames.join(', ');
+
       const txPayload: any = {
         amount: finalAmount,
         type: type as any,
         date: selectedDate,
-        categoryId,
+        categoryId: primaryCategoryId,
+        category: categoryString,
+        categories: selectedCatNames,
+        categoryIds: effectiveCatIds,
         description: description.trim(),
         createdAt: now,
         ...(showInvestmentLink && inversionIdRelacionada ? { inversionIdRelacionada } : {}),
@@ -273,6 +290,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
       // Reset form fields
       setAmount('');
       setCategoryId('');
+      setSelectedCategoryIds([]);
       setDescription('');
       setValorTotal('');
       setFotoProd(null);
@@ -294,25 +312,25 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
   };
 
   return (
-    <div className="w-full h-full flex flex-col relative overflow-hidden bg-white">
+    <div className="w-full h-full flex flex-col relative overflow-hidden bg-white dark:bg-[#17171A]">
       <AnimatePresence>
         {successAnim && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[60] bg-white/95 backdrop-blur-md flex flex-col items-center justify-center rounded-[2.5rem]"
+            className="absolute inset-0 z-[60] bg-white/95 dark:bg-[#17171A]/95 backdrop-blur-md flex flex-col items-center justify-center rounded-[28px]"
           >
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', bounce: 0.5 }}
-              className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center shadow-[0_10px_40px_rgba(16,185,129,0.3)] text-white mb-6"
+              className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center shadow-[0_10px_40px_rgba(16,185,129,0.3)] text-white mb-6"
             >
-              <Check size={48} strokeWidth={3} />
+              <Check size={40} strokeWidth={3} />
             </motion.div>
-            <h3 className="text-2xl font-black text-slate-800 tracking-tight">¡Bóveda Actualizada!</h3>
-            <p className="text-slate-500 font-bold mt-2">Movimiento y pasarelas sincronizados con éxito</p>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">¡Bóveda Actualizada!</h3>
+            <p className="text-slate-500 dark:text-slate-400 font-bold mt-2">Movimiento y pasarelas sincronizados con éxito</p>
           </motion.div>
         )}
 
@@ -322,11 +340,11 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.9 }}
             className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[70] ${
-              toastMessage.includes('Debes') || toastMessage.includes('Error') ? 'bg-rose-600' : 'bg-slate-800'
-            } text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-3 font-bold text-sm`}
+              toastMessage.includes('Debes') || toastMessage.includes('Error') ? 'bg-rose-600' : 'bg-slate-900 dark:bg-black'
+            } text-white px-8 py-3.5 rounded-full shadow-2xl flex items-center gap-3 font-bold text-xs border border-white/10`}
           >
             {!toastMessage.includes('Debes') && !toastMessage.includes('Error') && (
-              <CheckCircle2 size={20} className="text-emerald-400" />
+              <CheckCircle2 size={18} className="text-emerald-400" />
             )}
             {toastMessage}
           </motion.div>
@@ -344,10 +362,10 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                   key={p.id}
                   type="button"
                   onClick={() => setSelectedProfileId(p.id)}
-                  className={`flex items-center justify-center gap-2 py-3 px-3 rounded-2xl border-2 transition-all font-bold text-sm ${
+                  className={`flex items-center justify-center gap-2 py-3 px-3 rounded-[20px] border-2 transition-all font-bold text-sm active:scale-[0.96] ${
                     selectedProfileId === p.id
-                      ? 'border-blue-500 bg-blue-50/30 text-blue-700 shadow-sm'
-                      : 'border-slate-50 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'
+                      ? 'border-[#0381FE] bg-[#0381FE]/10 text-[#0381FE] dark:text-[#387AFF] shadow-sm'
+                      : 'border-transparent bg-slate-100 dark:bg-[#1C1C1E] text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-zinc-800'
                   }`}
                 >
                   {p.type === 'Business' ? <Briefcase size={17} /> : <UserIcon size={17} />}
@@ -370,10 +388,10 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                     key={t.id}
                     type="button"
                     onClick={() => setType(t.id)}
-                    className={`flex-1 min-w-[120px] sm:min-w-[100px] py-2.5 px-3.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-all duration-300 border-2 ${
+                    className={`flex-1 min-w-[120px] sm:min-w-[100px] py-2.5 px-3.5 rounded-full text-[11px] font-black uppercase tracking-wider transition-transform duration-150 active:scale-[0.96] border-2 ${
                       isActive
-                        ? 'bg-blue-50/50 border-blue-500/20 text-blue-700 shadow-sm'
-                        : 'bg-white border-slate-50 text-slate-400 hover:border-slate-100'
+                        ? 'bg-[#0381FE]/15 border-[#0381FE]/30 text-[#0381FE] dark:text-[#387AFF] shadow-none'
+                        : 'bg-slate-100 dark:bg-[#1C1C1E] border-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-zinc-800'
                     }`}
                   >
                     {t.label}
@@ -408,24 +426,24 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                         type="button"
                         whileTap={{ scale: 0.96 }}
                         onClick={() => setPaymentMethod(method.id)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border-2 font-black text-xs uppercase tracking-wider transition-all duration-200 shadow-sm ${
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 font-black text-xs uppercase tracking-wider transition-all duration-150 shadow-sm ${
                           isSelected
-                            ? 'bg-slate-900 border-slate-900 text-white shadow-md shadow-slate-900/10'
-                            : 'bg-slate-50/70 border-slate-100 text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                            ? 'bg-[#0381FE] border-[#0381FE] text-white shadow-md shadow-blue-500/20'
+                            : 'bg-slate-100 dark:bg-[#1C1C1E] border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-zinc-800'
                         }`}
                       >
                         {method.id === 'apartado' ? (
-                          <Package size={15} className={isSelected ? 'text-amber-300' : 'text-amber-500'} />
+                          <Package size={15} className={isSelected ? 'text-amber-200' : 'text-amber-500'} />
                         ) : method.isCreditGateway ? (
-                          <CreditCard size={15} className={isSelected ? 'text-blue-300' : 'text-blue-500'} />
+                          <CreditCard size={15} className={isSelected ? 'text-blue-100' : 'text-[#0381FE]'} />
                         ) : (
-                          <Wallet size={15} className={isSelected ? 'text-emerald-300' : 'text-emerald-500'} />
+                          <Wallet size={15} className={isSelected ? 'text-emerald-100' : 'text-emerald-500'} />
                         )}
                         <span>{method.name}</span>
                         {method.isCreditGateway && (
                           <span
-                            className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold tracking-tight ${
-                              isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
+                            className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold tracking-tight ${
+                              isSelected ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-zinc-700 text-slate-700 dark:text-slate-300'
                             }`}
                           >
                             {method.commissionPercent}% • {method.disbursementDays}d
@@ -433,8 +451,8 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                         )}
                         {method.id === 'apartado' && (
                           <span
-                            className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold tracking-tight ${
-                              isSelected ? 'bg-amber-400/20 text-amber-200' : 'bg-amber-100 text-amber-700'
+                            className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold tracking-tight ${
+                              isSelected ? 'bg-amber-400/20 text-amber-100' : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
                             }`}
                           >
                             Abono
@@ -450,7 +468,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
 
           {/* 4. Monto Principal */}
           <div className="space-y-4">
-            <div className="bg-white rounded-[2.2rem] border border-slate-100 p-8 shadow-sm">
+            <div className="bg-slate-50 dark:bg-[#1C1C1E] rounded-[28px] border-none dark:border dark:border-white/5 p-6 sm:p-8 shadow-sm">
               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">
                 {isSeparado
                   ? 'Abono Inicial (Monto en Caja Real)'
@@ -460,15 +478,15 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
               </label>
               <div className="flex items-center gap-5 pr-2">
                 <div
-                  className={`w-16 h-16 rounded-[1.4rem] flex items-center justify-center shrink-0 shadow-inner ${
+                  className={`w-14 h-14 rounded-[20px] flex items-center justify-center shrink-0 shadow-inner ${
                     isSeparado
-                      ? 'bg-amber-50 text-amber-500'
+                      ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-500'
                       : isCreditGateway
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'bg-emerald-50 text-emerald-600'
+                      ? 'bg-[#0381FE]/15 text-[#0381FE] dark:text-[#387AFF]'
+                      : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
                   }`}
                 >
-                  <DollarSign size={32} strokeWidth={2.5} />
+                  <DollarSign size={30} strokeWidth={2.5} />
                 </div>
                 <input
                   type="number"
@@ -478,7 +496,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="0.00"
-                  className="w-full bg-transparent text-4xl sm:text-5xl font-black text-slate-800 placeholder:text-slate-100 outline-none tracking-tight"
+                  className="w-full bg-transparent text-4xl sm:text-5xl font-black text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-zinc-700 outline-none tracking-tight"
                 />
               </div>
             </div>
@@ -490,12 +508,12 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="bg-slate-50/80 border border-slate-200/80 rounded-[2.2rem] p-6 space-y-5 shadow-sm"
+                  className="bg-slate-100/90 dark:bg-[#1C1C1E] border-none dark:border dark:border-white/5 rounded-[28px] p-6 space-y-5 shadow-sm"
                 >
                   {/* Top: Summary header */}
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-200/60">
-                    <div className="flex items-center gap-2 text-xs font-black text-slate-700 uppercase tracking-wider">
-                      <Sparkles size={16} className="text-blue-500" />
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-200/60 dark:border-white/5">
+                    <div className="flex items-center gap-2 text-xs font-black text-slate-800 dark:text-white uppercase tracking-wider">
+                      <Sparkles size={16} className="text-[#0381FE]" />
                       <span>Liquidación Proyectada ({activeMethodConfig?.name})</span>
                     </div>
                     {/* Editable % trigger */}
@@ -503,14 +521,14 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                       <button
                         type="button"
                         onClick={() => setIsEditingRate(true)}
-                        className="text-[11px] font-extrabold text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-lg transition-colors"
+                        className="text-[11px] font-extrabold text-[#0381FE] dark:text-[#387AFF] hover:underline flex items-center gap-1 bg-[#0381FE]/10 px-2.5 py-1 rounded-full transition-colors active:scale-95"
                       >
                         <Edit2 size={11} />
                         Editar % ({activeRateNum}%)
                       </button>
                     ) : (
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold text-slate-400">Tarifa especial:</span>
+                        <span className="text-[10px] font-bold text-slate-400">Tarifa:</span>
                         <input
                           type="number"
                           step="0.1"
@@ -518,12 +536,12 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                           max="100"
                           value={customCommissionRate}
                           onChange={(e) => setCustomCommissionRate(e.target.value)}
-                          className="w-14 px-2 py-1 bg-white border border-blue-400 rounded-md text-xs font-bold text-blue-700 outline-none"
+                          className="w-14 px-2 py-1 bg-white dark:bg-zinc-800 border-none rounded-lg text-xs font-bold text-[#0381FE] dark:text-[#387AFF] outline-none"
                         />
                         <button
                           type="button"
                           onClick={() => setIsEditingRate(false)}
-                          className="text-[10px] bg-blue-600 text-white font-bold px-2 py-1 rounded-md"
+                          className="text-[10px] bg-[#0381FE] text-white font-bold px-2.5 py-1 rounded-full active:scale-95"
                         >
                           OK
                         </button>
@@ -533,16 +551,16 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
 
                   {/* Financial Breakdown */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                    <div className="bg-white dark:bg-[#252528] rounded-[20px] p-4 border-none shadow-sm">
                       <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">
                         Valor Bruto Venta
                       </span>
-                      <span className="text-lg font-black text-slate-800 mt-1 block">
+                      <span className="text-lg font-black text-slate-900 dark:text-white mt-1 block">
                         {formatCurrency(gatewayBreakdown.grossAmount)}
                       </span>
                     </div>
 
-                    <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                    <div className="bg-white dark:bg-[#252528] rounded-[20px] p-4 border-none shadow-sm">
                       <span className="block text-[10px] font-black uppercase tracking-widest text-rose-500">
                         Comisión Pasarela ({gatewayBreakdown.commissionPercent}%)
                       </span>
@@ -551,8 +569,8 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                       </span>
                     </div>
 
-                    <div className="bg-emerald-500 text-white rounded-2xl p-4 shadow-md shadow-emerald-500/20">
-                      <span className="block text-[10px] font-black uppercase tracking-widest text-emerald-100">
+                    <div className="bg-[#0381FE] text-white rounded-[20px] p-4 shadow-md shadow-blue-500/20">
+                      <span className="block text-[10px] font-black uppercase tracking-widest text-blue-100">
                         Neto Real a Recibir
                       </span>
                       <span className="text-xl font-black mt-1 block tracking-tight">
@@ -564,28 +582,28 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                   {/* Estimated Disbursement Date & Status Pill */}
                   <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-2">
-                      <Clock size={16} className="text-blue-500 shrink-0" />
-                      <span className="font-extrabold text-slate-700">
+                      <Clock size={16} className="text-[#0381FE] shrink-0" />
+                      <span className="font-extrabold text-slate-700 dark:text-slate-300">
                         Recibes el pago{' '}
                         {gatewayBreakdown.disbursementDays === 0
                           ? 'hoy mismo'
                           : `en ${gatewayBreakdown.disbursementDays} días`}
                         :
                       </span>
-                      <span className="bg-blue-100/70 text-blue-700 px-2.5 py-1 rounded-full font-black text-[11px]">
+                      <span className="bg-[#0381FE]/15 text-[#0381FE] dark:text-[#387AFF] px-2.5 py-1 rounded-full font-black text-[11px]">
                         {formatEstimatedDate(gatewayBreakdown.estimatedDisbursementDate)}
                       </span>
                     </div>
 
                     {/* Disbursement Status selector */}
-                    <div className="flex items-center gap-1.5 bg-white p-1 rounded-2xl border border-slate-200 self-start sm:self-auto">
+                    <div className="flex items-center gap-1.5 bg-slate-200/70 dark:bg-zinc-800 p-1 rounded-full self-start sm:self-auto">
                       <button
                         type="button"
                         onClick={() => setDisbursementStatus('pendiente')}
-                        className={`px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-full font-black text-[10px] uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 ${
                           disbursementStatus === 'pendiente'
-                            ? 'bg-amber-100 text-amber-800 shadow-sm'
-                            : 'text-slate-400 hover:text-slate-600'
+                            ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 shadow-sm'
+                            : 'text-slate-500 dark:text-slate-400'
                         }`}
                       >
                         <Hourglass size={12} />
@@ -594,10 +612,10 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                       <button
                         type="button"
                         onClick={() => setDisbursementStatus('desembolsado')}
-                        className={`px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-wider transition-all flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-full font-black text-[10px] uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 ${
                           disbursementStatus === 'desembolsado'
                             ? 'bg-emerald-500 text-white shadow-sm'
-                            : 'text-slate-400 hover:text-slate-600'
+                            : 'text-slate-500 dark:text-slate-400'
                         }`}
                       >
                         <ShieldCheck size={12} />
@@ -616,22 +634,22 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="bg-amber-50/40 border border-amber-200/70 rounded-[2.2rem] p-7 space-y-6"
+                  className="bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 rounded-[28px] p-6 sm:p-7 space-y-6"
                 >
-                  <div className="flex items-center justify-between pb-3 border-b border-amber-200/50">
+                  <div className="flex items-center justify-between pb-3 border-b border-amber-200/50 dark:border-amber-900/30">
                     <div className="flex items-center gap-2">
-                      <Package size={18} className="text-amber-600" />
-                      <h4 className="font-black text-slate-800 text-sm tracking-tight">Detalles de Reserva / Apartado</h4>
+                      <Package size={18} className="text-amber-600 dark:text-amber-400" />
+                      <h4 className="font-black text-slate-900 dark:text-white text-sm tracking-tight">Detalles de Reserva / Apartado</h4>
                     </div>
                     {valorTotalNum > 0 && (
-                      <span className="text-[11px] font-black text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
+                      <span className="text-[11px] font-black text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-3 py-1 rounded-full">
                         Saldo Pendiente: {formatCurrency(saldoPendienteSeparado)}
                       </span>
                     )}
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black text-amber-800 uppercase tracking-widest mb-3">
+                    <label className="block text-[10px] font-black text-amber-800 dark:text-amber-300 uppercase tracking-widest mb-3">
                       Valor Total de la Venta ($)
                     </label>
                     <div className="relative">
@@ -643,17 +661,17 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                         required={isSeparado}
                         value={valorTotal}
                         onChange={(e) => setValorTotal(e.target.value)}
-                        className="w-full pl-14 pr-6 py-4 bg-white border border-amber-200 rounded-[1.5rem] focus:outline-none focus:ring-4 focus:ring-amber-500/10 transition-all font-black text-slate-800 text-xl shadow-sm"
+                        className="w-full pl-14 pr-6 py-4 bg-white dark:bg-[#1C1C1E] border border-amber-200 dark:border-amber-900/40 rounded-[20px] focus:outline-none focus:ring-2 focus:ring-amber-500/20 transition-all font-black text-slate-900 dark:text-white text-xl shadow-sm"
                         placeholder="0.00"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">
+                    <label className="block text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">
                       Foto del Producto (Opcional)
                     </label>
-                    <label className="flex items-center justify-center gap-3 bg-white border-2 border-dashed border-amber-200 hover:border-amber-400 hover:bg-amber-50 text-slate-400 hover:text-amber-700 rounded-[1.5rem] py-4 px-6 transition-all cursor-pointer shadow-sm">
+                    <label className="flex items-center justify-center gap-3 bg-white dark:bg-[#1C1C1E] border-2 border-dashed border-amber-200 dark:border-amber-900/40 hover:border-amber-400 dark:hover:border-amber-700 text-slate-400 hover:text-amber-700 rounded-[20px] py-4 px-6 transition-all cursor-pointer shadow-sm">
                       <ImageIcon size={22} />
                       <span className="font-bold text-sm truncate">{fotoProd ? fotoProd.name : 'Subir Foto de Prenda/Producto'}</span>
                       <input
@@ -669,37 +687,50 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
             </AnimatePresence>
           </div>
 
-          {/* 5. Categorías */}
+          {/* 5. Categorías (Multi-selección One UI 9.0) */}
           <div className="space-y-3">
-            <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Categoría</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-black text-slate-400 dark:text-zinc-500 uppercase tracking-[0.2em]">
+                Categorías {selectedCategoryIds.length > 0 ? `(${selectedCategoryIds.length} seleccionadas)` : ''}
+              </label>
+              {selectedCategoryIds.length > 1 && (
+                <span className="text-[10px] font-extrabold text-[#0381FE] dark:text-[#387AFF] bg-[#0381FE]/10 px-2.5 py-0.5 rounded-full">
+                  Múltiple
+                </span>
+              )}
+            </div>
             {filteredCategories.length === 0 ? (
-              <div className="bg-slate-50 border border-dashed border-slate-200 rounded-3xl p-8 text-center">
+              <div className="bg-slate-100 dark:bg-[#1C1C1E] border border-dashed border-slate-200 dark:border-white/10 rounded-[28px] p-8 text-center">
                 <p className="text-slate-400 font-bold mb-4 text-sm">No hay categorías configuradas.</p>
                 <button
                   type="button"
                   onClick={() => navigate('/settings')}
-                  className="bg-white border border-slate-200 text-slate-600 font-bold px-6 py-3 rounded-2xl hover:bg-slate-100 transition-all text-sm shadow-sm"
+                  className="bg-white dark:bg-zinc-800 border-none text-slate-700 dark:text-slate-200 font-bold px-6 py-3 rounded-full hover:bg-slate-200 transition-all text-sm shadow-sm active:scale-95"
                 >
                   Configurar Categorías
                 </button>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-2.5">
-                {filteredCategories.map((cat) => (
-                  <motion.button
-                    key={cat.id}
-                    type="button"
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setCategoryId(cat.id)}
-                    className={`px-5 py-3 rounded-full font-black text-[10px] uppercase tracking-[0.1em] transition-all border-2 ${
-                      categoryId === cat.id
-                        ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20'
-                        : 'bg-white border-slate-50 text-slate-400 hover:border-slate-200 hover:text-slate-600 shadow-sm'
-                    }`}
-                  >
-                    {cat.name}
-                  </motion.button>
-                ))}
+              <div className="flex flex-wrap gap-2">
+                {filteredCategories.map((cat) => {
+                  const isSelected = selectedCategoryIds.includes(cat.id) || (selectedCategoryIds.length === 0 && categoryId === cat.id);
+                  return (
+                    <motion.button
+                      key={cat.id}
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => toggleCategory(cat.id)}
+                      className={`px-3.5 py-2 rounded-full font-black text-[11px] uppercase tracking-wider transition-all flex items-center gap-1.5 active:scale-95 ${
+                        isSelected
+                          ? 'bg-[#0381FE] text-white shadow-md shadow-blue-500/25 ring-2 ring-[#0381FE]/30'
+                          : 'bg-slate-100 dark:bg-[#1C1C1E] text-slate-600 dark:text-zinc-400 hover:bg-slate-200 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      {isSelected && <Check size={13} strokeWidth={3} className="shrink-0" />}
+                      <span>{cat.name}</span>
+                    </motion.button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -714,7 +745,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-[1.8rem] focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all font-bold text-slate-700 resize-none text-sm placeholder:text-slate-300"
+                className="w-full px-6 py-4 bg-slate-100 dark:bg-zinc-800/80 border-none rounded-[20px] focus:outline-none focus:ring-2 focus:ring-[#0381FE]/30 transition-all font-bold text-slate-900 dark:text-white resize-none text-sm placeholder:text-slate-400"
                 placeholder={
                   isSeparado
                     ? 'Ej. María Pérez - Vestido Floreado Talla M'
@@ -732,7 +763,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                   <select
                     value={inversionIdRelacionada}
                     onChange={(e) => setInversionIdRelacionada(e.target.value)}
-                    className="w-full pl-6 pr-12 py-4 bg-indigo-50/50 border border-indigo-100 rounded-[1.8rem] focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-bold text-slate-700 appearance-none cursor-pointer text-sm"
+                    className="w-full pl-6 pr-12 py-4 bg-slate-100 dark:bg-zinc-800/80 border-none rounded-[20px] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all font-bold text-slate-900 dark:text-white appearance-none cursor-pointer text-sm"
                   >
                     <option value="">Ingreso Independiente</option>
                     {investments.map((inv) => (
@@ -752,7 +783,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
               <button
                 type="button"
                 onClick={() => setShowDate(!showDate)}
-                className="text-[10px] font-black text-blue-500 hover:text-blue-600 uppercase tracking-widest flex items-center gap-2 px-1"
+                className="text-[10px] font-black text-[#0381FE] dark:text-[#387AFF] hover:underline uppercase tracking-widest flex items-center gap-2 px-1"
               >
                 <Calendar size={14} />
                 {showDate ? 'Cerrar selector de fecha' : 'Cambiar fecha del registro'}
@@ -770,7 +801,7 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
                       required
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="w-full px-6 py-4 bg-white border border-slate-200 rounded-[1.5rem] focus:outline-none font-bold text-slate-700 text-sm shadow-sm"
+                      className="w-full px-6 py-4 bg-slate-100 dark:bg-zinc-800/80 border-none rounded-[20px] focus:outline-none font-bold text-slate-900 dark:text-white text-sm shadow-sm"
                     />
                   </motion.div>
                 )}
@@ -780,18 +811,18 @@ export const TransactionForm = ({ onComplete }: { onComplete?: () => void }) => 
         </div>
 
         {/* Sticky Footer */}
-        <div className="shrink-0 p-5 md:px-10 border-t border-slate-100 bg-white/90 backdrop-blur-xl flex gap-3">
+        <div className="shrink-0 p-5 md:px-10 border-t border-slate-100 dark:border-white/5 bg-white/95 dark:bg-[#17171A]/95 backdrop-blur-xl flex gap-3">
           <button
             type="button"
             onClick={() => onComplete && onComplete()}
-            className="flex-1 py-4 px-6 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 font-black uppercase tracking-[0.1em] rounded-[1.8rem] transition-all text-[11px]"
+            className="flex-1 py-4 px-6 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-slate-300 font-black uppercase tracking-[0.1em] rounded-full transition-all text-[11px] active:scale-95"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={loading || profiles.length === 0}
-            className="flex-[2] py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase tracking-[0.2em] rounded-full transition-all shadow-xl shadow-blue-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2.5 text-[11px]"
+            className="flex-[2] py-4 px-6 bg-[#0381FE] hover:bg-[#0270df] text-white font-black uppercase tracking-[0.2em] rounded-full transition-all shadow-xl shadow-blue-500/20 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2.5 text-[11px]"
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

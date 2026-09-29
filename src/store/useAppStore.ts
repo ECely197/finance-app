@@ -25,6 +25,25 @@ interface AppState {
   setSelectedNoteId: (id: string | null) => void;
   isFocusModeActive: boolean;
   setIsFocusModeActive: (active: boolean) => void;
+  isDarkMode: boolean;
+  setDarkMode: (dark: boolean) => void;
+  toggleDarkMode: () => void;
+}
+
+const getInitialDarkMode = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const stored = localStorage.getItem('sofilu_dark_mode');
+  if (stored !== null) return stored === 'true';
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+};
+
+const initialDark = getInitialDarkMode();
+if (typeof document !== 'undefined') {
+  if (initialDark) {
+    document.documentElement.classList.add('dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+  }
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -44,4 +63,22 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedNoteId: (id) => set({ selectedNoteId: id }),
   isFocusModeActive: false,
   setIsFocusModeActive: (active) => set({ isFocusModeActive: active }),
+  isDarkMode: initialDark,
+  setDarkMode: (isDarkMode) => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', isDarkMode);
+      localStorage.setItem('sofilu_dark_mode', isDarkMode ? 'true' : 'false');
+    }
+    set({ isDarkMode });
+  },
+  toggleDarkMode: () => {
+    set((state) => {
+      const next = !state.isDarkMode;
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.toggle('dark', next);
+        localStorage.setItem('sofilu_dark_mode', next ? 'true' : 'false');
+      }
+      return { isDarkMode: next };
+    });
+  },
 }));

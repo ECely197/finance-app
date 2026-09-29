@@ -1,7 +1,10 @@
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Plus, Home, TrendingUp, Settings, LogOut, ScrollText, Target, X, CheckSquare, Moon, CalendarClock, Brain, PieChart } from 'lucide-react';
+import { 
+  LayoutDashboard, Plus, TrendingUp, Settings, LogOut, 
+  ScrollText, Target, X, CheckSquare, Moon, Sun, CalendarClock, PieChart 
+} from 'lucide-react';
 import { ProfileSelector } from './ProfileSelector';
 import { TransactionForm } from '../transactions/TransactionForm';
 import { GlobalTaskTicker } from './GlobalTaskTicker';
@@ -14,14 +17,19 @@ import { signOut } from 'firebase/auth';
 import { useAppStore } from '../../store/useAppStore';
 import { Ripple } from '../ui/Ripple';
 
+const ONE_UI_SPRING = {
+  type: "spring" as const,
+  stiffness: 380,
+  damping: 30
+};
+
 export const MainLayout = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showClosingModal, setShowClosingModal] = useState(false);
   const [showTransactionsModal, setShowTransactionsModal] = useState(false);
 
-  const { isPomodoroRunning } = useAppStore();
+  const { isPomodoroRunning, isDarkMode, toggleDarkMode } = useAppStore();
 
   const navItems = [
     { name: 'Resumen', path: '/dashboard', icon: LayoutDashboard },
@@ -70,50 +78,75 @@ export const MainLayout = () => {
       <GlobalCommandPalette />
       <GlobalTaskTicker />
       <DailyClosingModal isOpen={showClosingModal} onClose={() => setShowClosingModal(false)} />
-      <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row text-slate-800 overflow-x-hidden pt-1">
       
-      {/* Sidebar Desktop */}
-      <aside className="hidden md:flex flex-col w-72 bg-[#F8FAFC] p-8 fixed h-full z-10">
-        <div className="mb-12 flex items-center gap-4">
-          <div className="w-12 h-12 rounded-[24px] bg-blue-500 text-white flex items-center justify-center font-black text-2xl shadow-premium">
-            S
+      {/* Root Layout with Ambient Glow Orbs */}
+      <div className="min-h-screen bg-[#F2F2F7] dark:bg-black text-[#1C1C1E] dark:text-[#F2F2F7] flex flex-col md:flex-row overflow-x-hidden selection:bg-[#0381FE]/20 selection:text-[#0381FE] relative">
+      
+      {/* Ambient Lighting Orbs for Real Glassmorphism Backdrop-Blur Depth */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-blue-600/20 dark:bg-blue-500/15 blur-[110px]" />
+        <div className="absolute top-1/3 -left-32 w-80 h-80 rounded-full bg-indigo-500/15 dark:bg-indigo-600/12 blur-[130px]" />
+        <div className="absolute -bottom-20 right-1/4 w-72 h-72 rounded-full bg-teal-500/15 dark:bg-teal-500/10 blur-[120px]" />
+      </div>
+
+      {/* Sidebar Desktop - One UI 9.0 Glassmorphic Squircle Aesthetics */}
+      <aside className="hidden md:flex flex-col w-72 bg-white/60 dark:bg-zinc-950/60 backdrop-blur-2xl p-6 fixed h-full z-10 border-r border-black/[0.04] dark:border-white/[0.06]">
+        <div className="mb-8 flex items-center justify-between px-2">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-[22px] bg-[#0381FE] text-white flex items-center justify-center font-black text-xl shadow-lg shadow-[#0381FE]/25">
+              S
+            </div>
+            <div>
+              <span className="text-xl font-black tracking-tight text-slate-900 dark:text-white block leading-none">SofiLu</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest">One UI 9.0</span>
+            </div>
           </div>
-          <span className="text-2xl font-black tracking-tight text-slate-800">SofiLu.</span>
+          <button
+            onClick={toggleDarkMode}
+            className="p-2.5 rounded-full bg-white/70 dark:bg-zinc-900/55 backdrop-blur-xl text-slate-600 dark:text-zinc-300 hover:text-[#0381FE] shadow-sm border border-black/5 dark:border-white/5 active:scale-95 transition-transform"
+            title={isDarkMode ? 'Modo Claro' : 'Modo Oscuro AMOLED'}
+          >
+            {isDarkMode ? <Sun size={18} className="text-amber-400" /> : <Moon size={18} />}
+          </button>
         </div>
-        <div className="mb-10">
+
+        <div className="mb-8">
            <motion.button
               whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileTap={{ scale: 0.96 }}
               onClick={() => setIsModalOpen(true)}
-              className="w-full bg-white border border-slate-100 hover:border-blue-500 text-slate-800 flex items-center justify-center gap-3 py-4 rounded-[24px] font-bold shadow-premium transition-all outline-none group relative overflow-hidden"
+              className="w-full bg-[#0381FE] hover:bg-[#026cd5] text-white flex items-center justify-center gap-3 py-3.5 rounded-[24px] font-bold shadow-lg shadow-[#0381FE]/30 transition-all outline-none group relative overflow-hidden active:scale-[0.96]"
            >
               <Ripple />
-              <div className="bg-blue-50 text-blue-500 p-1.5 rounded-full group-hover:bg-blue-500 group-hover:text-white transition-colors">
+              <div className="bg-white/20 p-1.5 rounded-full">
                  <Plus size={18} strokeWidth={3}/>
               </div>
-              Nueva Transacción
+              <span>Nueva Transacción</span>
            </motion.button>
         </div>
 
-        <nav className="flex-1 space-y-2">
+        <nav className="flex-1 space-y-1.5 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => {
             return (
               <NavLink
                 key={item.name}
                 to={item.path!}
                 className={({ isActive }) => 
-                  `flex items-center gap-4 px-5 py-4 rounded-[24px] font-bold transition-all duration-300 outline-none relative overflow-hidden ${
+                  `flex items-center gap-3.5 px-4 py-3 rounded-[20px] font-bold transition-all duration-200 outline-none relative overflow-hidden ${
                     isActive 
-                    ? 'bg-white shadow-premium text-blue-600' 
-                    : 'text-slate-400 hover:text-slate-800 hover:bg-white/50'
+                    ? 'bg-[#0381FE]/15 dark:bg-[#0381FE]/25 text-[#0381FE] dark:text-[#387AFF] shadow-sm' 
+                    : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-zinc-900/40'
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
                     <Ripple />
-                    <item.icon size={22} className={isActive ? 'text-blue-500' : 'opacity-70'} strokeWidth={isActive ? 2.5 : 2} />
-                    {item.name}
+                    <item.icon size={20} className={isActive ? 'text-[#0381FE] dark:text-[#387AFF]' : 'opacity-70'} strokeWidth={isActive ? 2.5 : 2} />
+                    <span>{item.name}</span>
+                    {isActive && (
+                      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#0381FE] dark:bg-[#387AFF]" />
+                    )}
                   </>
                 )}
               </NavLink>
@@ -121,58 +154,68 @@ export const MainLayout = () => {
           })}
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-slate-100/50">
+        <div className="mt-auto pt-4 border-t border-black/[0.04] dark:border-white/[0.05] space-y-1">
           <button 
             onClick={() => setShowClosingModal(true)}
-            className="flex items-center gap-4 px-5 py-4 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-[24px] transition-all w-full font-bold mb-2 group relative overflow-hidden"
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-500 dark:text-zinc-400 hover:text-[#0381FE] dark:hover:text-[#387AFF] hover:bg-white/60 dark:hover:bg-zinc-900/40 rounded-[20px] transition-all w-full font-bold group relative overflow-hidden active:scale-[0.96]"
           >
             <Ripple />
-            <Moon size={22} className="opacity-70 group-hover:text-indigo-500" strokeWidth={2}/>
-            Cierre de Día
+            <Moon size={20} className="opacity-70 group-hover:text-[#0381FE]" strokeWidth={2}/>
+            <span>Cierre de Día</span>
           </button>
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-4 px-5 py-4 text-slate-400 hover:text-rose-600 hover:bg-white rounded-[24px] transition-all w-full font-bold group relative overflow-hidden"
+            className="flex items-center gap-3.5 px-4 py-3 text-slate-500 dark:text-zinc-400 hover:text-rose-600 hover:bg-white/60 dark:hover:bg-zinc-900/40 rounded-[20px] transition-all w-full font-bold group relative overflow-hidden active:scale-[0.96]"
           >
             <Ripple />
-            <LogOut size={22} className="opacity-70 group-hover:text-rose-500" strokeWidth={2}/>
-            Cerrar sesión
+            <LogOut size={20} className="opacity-70 group-hover:text-rose-500" strokeWidth={2}/>
+            <span>Cerrar sesión</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 md:ml-72 mb-24 md:mb-0 w-full min-h-screen flex flex-col bg-[#F8FAFC]">
-        {/* Top Header */}
-        <header className="sticky top-0 z-20 bg-[#F8FAFC]/80 backdrop-blur-xl px-6 md:px-10 py-6 flex items-center justify-between">
-          <div className="md:hidden flex items-center gap-3">
-             <div className="w-10 h-10 rounded-[20px] bg-blue-500 text-white flex items-center justify-center font-black shadow-premium">S</div>
-             <span className="font-black tracking-tight text-slate-800 text-xl">SofiLu.</span>
+      <main className="flex-1 md:ml-72 mb-28 md:mb-0 w-full min-h-screen flex flex-col relative z-1">
+        {/* Top Header - Samsung Frosted Glass Sticky Bar */}
+        <header className="sticky top-0 z-40 backdrop-blur-2xl bg-[#F2F2F7]/75 dark:bg-black/75 px-4 md:px-10 py-3.5 flex items-center justify-between border-b border-black/[0.04] dark:border-white/[0.04]">
+          <div className="md:hidden flex items-center gap-2.5">
+             <div className="w-10 h-10 rounded-[20px] bg-[#0381FE] text-white flex items-center justify-center font-black shadow-md shadow-[#0381FE]/25 text-lg shrink-0">S</div>
+             <div className="min-w-0">
+               <span className="font-extrabold tracking-tight text-slate-900 dark:text-white text-base block leading-none truncate">SofiLu</span>
+               <span className="text-[9px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider block mt-0.5 truncate">One UI 9.0</span>
+             </div>
           </div>
 
-          {/* Quick Capture Hint */}
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-100/50 rounded-lg border border-slate-200 text-slate-400 cursor-text hover:bg-slate-100 transition-colors ml-4 shadow-inner" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}>
-             <span className="text-xs font-semibold mr-2">Captura Rápida...</span>
-             <span className="text-[10px] font-bold bg-white px-1.5 py-0.5 rounded text-slate-500 shadow-sm border border-slate-200">Cmd K</span>
+          {/* Quick Capture Hint (Desktop) */}
+          <div className="hidden md:flex items-center gap-2 px-3.5 py-1.5 bg-white/70 dark:bg-zinc-900/55 backdrop-blur-xl rounded-full border border-black/5 dark:border-white/5 text-slate-400 dark:text-zinc-500 cursor-text hover:bg-white/90 dark:hover:bg-zinc-800 transition-colors ml-4 shadow-sm" onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}>
+             <span className="text-xs font-semibold mr-2">Búsqueda rápida...</span>
+             <span className="text-[10px] font-bold bg-[#F2F2F7] dark:bg-zinc-800 px-2 py-0.5 rounded-full text-slate-500 dark:text-zinc-400">Cmd K</span>
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={() => setShowClosingModal(true)} className="p-2 text-indigo-500 hover:bg-indigo-100 rounded-full transition-colors md:hidden">
-               <Moon size={20} />
+            <button 
+              onClick={toggleDarkMode} 
+              className="p-2 text-slate-600 dark:text-zinc-300 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors md:hidden active:scale-90"
+              title={isDarkMode ? 'Modo Claro' : 'Modo Oscuro AMOLED'}
+            >
+               {isDarkMode ? <Sun size={19} className="text-amber-400" /> : <Moon size={19} />}
+            </button>
+            <button onClick={() => setShowClosingModal(true)} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-full transition-colors md:hidden active:scale-90" title="Cierre de Día">
+               <CalendarClock size={19} />
             </button>
             <ProfileSelector />
           </div>
         </header>
 
         {/* Page Content with Slide Transition */}
-        <div className="flex-1 p-6 md:p-10 max-w-6xl mx-auto w-full">
+        <div className="flex-1 p-3.5 sm:p-6 md:p-10 max-w-6xl mx-auto w-full">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             >
                <Outlet />
             </motion.div>
@@ -182,146 +225,47 @@ export const MainLayout = () => {
 
       {/*
         ════════════════════════════════════════════════════════
-          MOBILE NAV — Organic Notch (Circle-Fitted)
+          ONE UI 9.0 FLOATING PILL DOCK & CLEAN PRIMARY + FAB
+          (Optimized for Pop-up View: 260px - 380px)
         ════════════════════════════════════════════════════════
-
-        SVG viewBox 0 0 100 68 + preserveAspectRatio=none
-        → responsive at any screen width.
-
-        Plus button:
-          position: bottom 10px, right 16px
-          center: x = screen - 44px (≈88.7% on 390px) , y = 38px from bottom
-          center in SVG space: x=88.5, y = 68-38 = 30
-          radius in SVG: 28px height / 68 = 0.41 normalized → fits at y=30±28
-
-        SVG path wraps the notch around Plus's circumference + 6px clearance.
-        The circle (r=28, center y=30) bottom at y=58. With clearance: y=64.
-        The notch dips to y=65 at x=88.5 — hugging the bottom of Plus.
-
-        Brain button:
-          Floats ABOVE-LEFT of Plus in a clean diagonal.
-          z-[100] (highest) ensures Brain is always touchable.
-
-        Both SVG bar (z-40) and nav icons (z-50) are BELOW both FABs.
       */}
-
-      {/* ── SVG Bar (Dual-fitted organic notch) ── */}
-      <div
-        className="md:hidden fixed bottom-0 left-0 w-full z-[40] pointer-events-none"
-        style={{ height: '68px' }}
-      >
-        <svg
-          width="100%" height="100%"
-          viewBox="0 0 100 68"
-          preserveAspectRatio="none"
-          style={{ display: 'block' }}
-        >
-          <defs>
-            <filter id="navCircleFit" x="-5%" y="-120%" width="115%" height="350%">
-              <feDropShadow dx="0" dy="-3" stdDeviation="7" floodColor="rgba(0,0,0,0.07)" />
-            </filter>
-          </defs>
-          <path
-            d="M 0,68 L 0,0 L 68,0
-               C 72,0 76,18 82,44
-               C 85,58 87,64 88.5,65
-               C 90,64 92,58 95,44
-               C 98,22 99.5,4 100,0
-               L 100,68 Z"
-            fill="white"
-            filter="url(#navCircleFit)"
-          />
-        </svg>
-      </div>
-
-      {/* ── Nav Icons (5 items, left 77%, well inside flat bar zone) ── */}
-      <nav
-        className="md:hidden fixed bottom-0 left-0 z-[50] pointer-events-auto"
-        style={{ height: '68px', width: '77%' }}
-      >
-        <div className="h-full flex items-center justify-around px-1">
+      <div className="md:hidden fixed bottom-4 left-3 right-3 max-[380px]:left-2 max-[380px]:right-2 z-50 flex items-center gap-2 pointer-events-none">
+        {/* Floating Capsule Dock with Real Glassmorphism */}
+        <nav className="flex-1 h-14 max-[380px]:h-13 rounded-full backdrop-blur-2xl bg-white/75 dark:bg-zinc-900/65 shadow-[0_8px_32px_rgba(0,0,0,0.25)] border border-white/40 dark:border-white/[0.08] px-2 max-[380px]:px-1 py-1 flex items-center justify-around pointer-events-auto">
           {mobileNavItems.map((item) => (
             <NavLink
               key={item.name}
               to={item.path!}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center gap-0.5 px-2 py-2 rounded-2xl transition-all duration-200 relative outline-none ${
-                  isActive ? 'text-blue-600' : 'text-slate-300 hover:text-slate-500'
+                `flex flex-col items-center justify-center transition-all duration-150 outline-none select-none active:scale-[0.92] ${
+                  isActive
+                    ? 'bg-[#0381FE]/15 text-[#0381FE] dark:text-[#387AFF] rounded-full px-3 max-[380px]:px-2 py-1 font-bold'
+                    : 'text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 px-2 max-[380px]:px-1 py-1 font-medium'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
-                  <Ripple />
-                  <item.icon size={24} strokeWidth={isActive ? 2.5 : 1.8} />
-                  <div
-                    className={`h-[3px] rounded-full bg-blue-500 transition-all duration-200 ${
-                      isActive ? 'w-5 opacity-100' : 'w-0 opacity-0'
-                    }`}
-                  />
+                  <item.icon size={19} strokeWidth={isActive ? 2.5 : 2} />
+                  <span className="text-[9px] max-[380px]:hidden tracking-tight mt-0.5">{item.name}</span>
                 </>
               )}
             </NavLink>
           ))}
-        </div>
-      </nav>
+        </nav>
 
-      {/*
-        FABs — both independent fixed elements, z above SVG bar.
-        Plus (z-95): CENTERED in the notch scoop.
-        Brain (z-100): Diagonal ABOVE-LEFT of Plus, highest z = always touchable.
-      */}
-
-      {/* Plus FAB:
-           /productividad → Home (volver a Finanzas)
-           otras rutas    → abrir modal de transacción      */}
-      <motion.button
-        className={`md:hidden fixed z-[95] w-14 h-14 rounded-full flex items-center justify-center text-white overflow-hidden ${
-          location.pathname === '/productividad' ? 'bg-slate-700' : 'bg-blue-500'
-        }`}
-        style={{
-          bottom: '10px',
-          right:  '16px',
-          boxShadow: location.pathname === '/productividad'
-            ? '0 8px 28px -4px rgba(30,41,59,0.45)'
-            : '0 8px 28px -4px rgba(59,130,246,0.55)',
-        }}
-        onClick={() =>
-          location.pathname === '/productividad'
-            ? navigate('/dashboard')
-            : setIsModalOpen(true)
-        }
-        whileHover={{ scale: 1.06 }}
-        whileTap={{ scale: 0.92 }}
-        title={location.pathname === '/productividad' ? 'Volver a Finanzas' : 'Nuevo Registro'}
-      >
-        <Ripple />
-        {location.pathname === '/productividad'
-          ? <Home size={24} strokeWidth={2.5} />
-          : <Plus size={26} strokeWidth={3} />}
-      </motion.button>
-
-      {/* Brain FAB:
-           /productividad → oculto (ya estás ahí)
-           otras rutas    → navegar a /productividad           */}
-      {location.pathname !== '/productividad' && (
+        {/* Clean Samsung Vibrant Blue + FAB (Only FAB, perfectly aligned) */}
         <motion.button
-          className="md:hidden fixed z-[100] w-12 h-12 rounded-full flex items-center justify-center bg-white text-blue-500 overflow-hidden"
-          style={{
-            bottom: '66px',
-            right:  '54px',
-            boxShadow: '0 6px 22px -4px rgba(0,0,0,0.12)',
-            border: '1.5px solid #e2e8f0',
-          }}
-          onClick={() => navigate('/productividad')}
-          whileHover={{ scale: 1.08 }}
+          whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.92 }}
-          title="Segundo Cerebro"
+          onClick={() => setIsModalOpen(true)}
+          className="w-13 h-13 max-[380px]:w-11 max-[380px]:h-11 rounded-[22px] max-[380px]:rounded-[18px] bg-[#0381FE] text-white flex items-center justify-center shadow-lg shadow-[#0381FE]/35 shrink-0 pointer-events-auto active:scale-95 transition-transform outline-none"
+          title="Nueva Transacción"
         >
           <Ripple />
-          <Brain size={22} strokeWidth={2.2} />
+          <Plus size={24} strokeWidth={3} className="max-[380px]:w-5 max-[380px]:h-5" />
         </motion.button>
-      )}
+      </div>
 
       {/* FocusLock Overlay */}
       <AnimatePresence>
@@ -335,20 +279,38 @@ export const MainLayout = () => {
           )}
       </AnimatePresence>
 
-      {/* Global Modals for Instant Navigation */}
+      {/* Global Modals: Full-screen or Bottom Sheet */}
       <AnimatePresence>
           {showTransactionsModal && (
-             <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-6 lg:p-10">
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowTransactionsModal(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
-                <motion.div initial={{ y: 50, opacity: 0, scale: 0.95 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 50, opacity: 0, scale: 0.95 }} className="bg-slate-50 relative w-full h-full md:rounded-[3rem] shadow-2xl z-10 overflow-hidden flex flex-col">
-                   <div className="flex justify-between items-center px-8 py-6 bg-white border-b border-slate-100 shrink-0">
+             <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 lg:p-10">
+                <motion.div 
+                  initial={{ opacity: 0 }} 
+                  animate={{ opacity: 1 }} 
+                  exit={{ opacity: 0 }} 
+                  onClick={() => setShowTransactionsModal(false)} 
+                  className="absolute inset-0 bg-black/60 backdrop-blur-md" 
+                />
+                <motion.div 
+                  initial={{ y: '100%', opacity: 0 }} 
+                  animate={{ y: 0, opacity: 1 }} 
+                  exit={{ y: '100%', opacity: 0 }} 
+                  transition={ONE_UI_SPRING}
+                  className="bg-white/95 dark:bg-[#17171A]/95 backdrop-blur-2xl relative w-full h-[90vh] sm:rounded-[32px] rounded-t-[32px] shadow-2xl z-10 overflow-hidden flex flex-col border border-white/40 dark:border-white/5"
+                >
+                   {/* One UI Drag Handle */}
+                   <div className="w-10 h-1 bg-slate-300 dark:bg-zinc-700 rounded-full mx-auto my-3 shrink-0" />
+
+                   <div className="flex justify-between items-center px-6 py-4 bg-transparent border-b border-black/[0.04] dark:border-white/[0.05] shrink-0">
                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center"><ScrollText size={20} /></div>
-                         <h2 className="text-xl font-black text-slate-800 tracking-tight">Historial Completo</h2>
+                         <div className="w-10 h-10 bg-[#0381FE]/15 text-[#0381FE] rounded-[18px] flex items-center justify-center"><ScrollText size={20} /></div>
+                         <div>
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Historial Completo</h2>
+                            <p className="text-xs text-slate-400 dark:text-zinc-500 font-medium">Movimientos y Pasarelas</p>
+                         </div>
                       </div>
-                      <button onClick={() => setShowTransactionsModal(false)} className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-full transition-colors outline-none"><X size={20} /></button>
+                      <button onClick={() => setShowTransactionsModal(false)} className="p-2.5 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-500 dark:text-zinc-400 rounded-full transition-colors outline-none active:scale-90"><X size={18} /></button>
                    </div>
-                   <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-10">
+                   <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8">
                       <TransactionsView hideHeader={true} />
                    </div>
                 </motion.div>
@@ -356,41 +318,39 @@ export const MainLayout = () => {
           )}
       </AnimatePresence>
 
-      {/* Global Transaction Modal (BottomSheet on Mobile, Centered on PC) */}
+      {/* Global Transaction Modal (Samsung One UI Bottom Sheet) */}
       <AnimatePresence>
          {isModalOpen && !isPomodoroRunning && (
-            <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4">
+            <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
                <motion.div 
                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
                  onClick={() => setIsModalOpen(false)} 
-                 className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+                 className="absolute inset-0 bg-black/60 backdrop-blur-md" 
                />
                
                <motion.div 
                  initial={{ y: '100%', opacity: 0 }} 
                  animate={{ y: 0, opacity: 1 }} 
                  exit={{ y: '100%', opacity: 0 }} 
-                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                 className="relative w-full max-w-2xl bg-white md:rounded-[2.5rem] rounded-t-[2.5rem] md:rounded-b-[2.5rem] shadow-2xl z-10 max-h-[90vh] flex flex-col"
+                 transition={ONE_UI_SPRING}
+                 className="relative w-full max-w-2xl bg-white/95 dark:bg-[#17171A]/95 backdrop-blur-2xl sm:rounded-[32px] rounded-t-[32px] shadow-2xl z-10 max-h-[92vh] flex flex-col border border-white/40 dark:border-white/5"
                >
-                 {/* Drag indicator for mobile */}
-                 <div className="w-full flex justify-center pt-4 pb-2 md:hidden" onClick={() => setIsModalOpen(false)}>
-                    <div className="w-12 h-1.5 bg-slate-200 rounded-full" />
-                 </div>
+                 {/* Drag indicator for Samsung Bottom Sheet */}
+                 <div className="w-10 h-1 bg-slate-300 dark:bg-zinc-700 rounded-full mx-auto my-3 shrink-0" onClick={() => setIsModalOpen(false)} />
 
                  {/* Modal Header Minimalist */}
-                 <div className="px-8 pt-8 pb-4 flex justify-between items-center bg-gradient-to-b from-blue-50/30 to-white md:rounded-t-[2.5rem] rounded-t-[2.5rem] border-b border-blue-50">
+                 <div className="px-6 pb-4 flex justify-between items-center bg-transparent border-b border-black/[0.04] dark:border-white/[0.05]">
                     <div>
-                       <h2 className="text-xl font-black text-slate-800 tracking-tight">Registro de Movimiento</h2>
-                       <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest mt-1">SofiLu Intelligent Vault</p>
+                       <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Registro de Movimiento</h2>
+                       <p className="text-[11px] font-bold text-[#0381FE] dark:text-[#387AFF] uppercase tracking-widest mt-0.5">SofiLu Intelligent Vault</p>
                     </div>
-                    <button onClick={() => setIsModalOpen(false)} className="p-2.5 bg-white border border-slate-100 hover:border-blue-200 text-slate-400 hover:text-blue-500 rounded-full transition-all shadow-sm outline-none">
-                       <X size={20} />
+                    <button onClick={() => setIsModalOpen(false)} className="p-2.5 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-500 dark:text-zinc-400 rounded-full transition-all shadow-sm outline-none active:scale-90">
+                       <X size={18} />
                     </button>
                  </div>
                  
                  {/* Modal flow content */}
-                 <div className="flex-1 flex flex-col min-h-0">
+                 <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar">
                     <TransactionForm 
                        onComplete={() => setIsModalOpen(false)} 
                     />
